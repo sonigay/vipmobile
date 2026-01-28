@@ -136,7 +136,8 @@ router.get('/', async (req, res) => {
             mode,           // 필터: 특정 모드
             limit = 100,
             offset = 0,
-            since           // ISO 날짜 문자열
+            since,          // ISO 날짜 문자열
+            status = 'open' // 기본적으로 'open' 상태인 것만 조회 (all, resolved, ignored)
         } = req.query;
 
         let query = supabase
@@ -150,10 +151,24 @@ router.get('/', async (req, res) => {
         if (mode) query = query.eq('mode', mode);
         if (since) query = query.gte('created_at', since);
 
+        // status 필터링
+        if (status && status !== 'all') {
+            query = query.eq('status', status);
+        }
+
         const { data, error, count } = await query;
 
         if (error) {
             console.error('[ErrorRoutes] Supabase query error:', error);
+            // status 컬럼이 아직 없을 수 있으므로 에러 핸들링
+            if (error.code === '42703') { // Undefined column
+                return res.json({
+                    success: true,
+                    data: [],
+                    total: 0,
+                    warning: 'Status column not found. Please run database migration.'
+                });
+            }
             return res.status(500).json({ success: false, error: error.message });
         }
 
@@ -161,12 +176,49 @@ router.get('/', async (req, res) => {
             success: true,
             data,
             total: count,
-            limit: parseInt(limit),
-            offset: parseInt(offset)
+            page: Math.floor(offset / limit) + 1,
+            limit: parseInt(limit)
         });
 
     } catch (err) {
         console.error('[ErrorRoutes] GET /api/errors error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/**
+ * PATCH /api/errors/:id/status
+ * 에러 상태 업데이트 (open -> resolved)
+ */
+router.patch('/:id/status', async (req, res) => {
+    try {
+        if (!supabase) {
+            return res.status(503).json({ success: false, error: 'Supabase not initialized' });
+        }
+
+        const { id } = req.params;
+        const { status } = req.body;
+
+        if (!['open', 'resolved', 'ignored'].includes(status)) {
+            return res.status(400).json({ success: false, error: 'Invalid status. Must be one of: open, resolved, ignored' });
+        }
+
+        const { data, error } = await supabase
+            .from('error_logs')
+            .update({ status })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('[ErrorRoutes] Status update error:', error);
+            return res.status(500).json({ success: false, error: error.message });
+        }
+
+        res.json({ success: true, data });
+
+    } catch (err) {
+        console.error('[ErrorRoutes] PATCH /api/errors/:id/status error:', err);
         res.status(500).json({ success: false, error: err.message });
     }
 });

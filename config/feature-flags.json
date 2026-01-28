@@ -20,5 +20,5 @@
   "quick-service": false,
   "quickServiceManagement:quickService": false,
   "quickServiceManagement:database": false,
-  "quickServiceManagement:bugs": false
+  "quickServiceManagement:bugs": true
 }

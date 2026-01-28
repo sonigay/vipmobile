@@ -61,6 +61,21 @@ import { getModeTitle, getModeIcon, MODE_ORDER } from '../config/modeConfig';
 // API Base URL
 const API_BASE_URL = process.env.REACT_APP_API_URL || '';
 
+// 에러 메시지에서 ID 파싱을 위한 구분자
+const ERROR_ID_SEPARATOR = '__ID:';
+
+/**
+ * 로그 메시지에서 ID와 실제 메시지를 분리
+ */
+const parseLogMessage = (fullMessage) => {
+    if (!fullMessage || typeof fullMessage !== 'string') return { message: fullMessage, id: null };
+    const parts = fullMessage.split(ERROR_ID_SEPARATOR);
+    if (parts.length > 1) {
+        return { message: parts[0], id: parts[1] };
+    }
+    return { message: fullMessage, id: null };
+};
+
 /**
  * 버그 진단 결과 상태
  */
@@ -219,27 +234,37 @@ const BugDiagnosticDashboard = () => {
         // 버그관리 탭인 경우, 실제 수집된 에러 로그를 백엔드에서 조회하여 추가
         if (tabKey === 'bugs' && result.status === DIAGNOSIS_STATUS.SUCCESS) {
             try {
-                // 최근 에러 20개 조회
-                const logsResponse = await fetch(`${API_BASE_URL}/api/errors?limit=20`);
+                // 최근 에러 20개 조회 (status=open)
+                const logsResponse = await fetch(`${API_BASE_URL}/api/errors?limit=20&status=open`);
                 if (logsResponse.ok) {
                     const logsData = await logsResponse.json();
+
+                    if (logsData.warning) {
+                        result.warnings.push(`⚠️ ${logsData.warning}`);
+                    }
+
                     if (logsData.success && logsData.data) {
-                        result.logs.push('✅ 최신 에러 로그 조회 성공');
+                        result.logs.push('✅ 최신 미해결 에러 로그 조회 성공');
 
                         // 조회된 에러를 결과의 errors/warnings 배열에 추가
                         logsData.data.forEach(log => {
                             const timestamp = new Date(log.created_at).toLocaleTimeString();
                             const logMsg = `[${timestamp}] [${log.type.toUpperCase()}] ${log.message}`;
+                            const errorId = log.id;
 
                             if (log.level === 'error') {
-                                result.errors.push(logMsg);
+                                result.errors.push(`${logMsg}${ERROR_ID_SEPARATOR}${errorId}`);
                             } else {
-                                result.warnings.push(logMsg);
+                                result.warnings.push(`${logMsg}${ERROR_ID_SEPARATOR}${errorId}`);
                             }
                         });
 
                         // 통계 정보
-                        result.logs.push(`📊 수집된 에러: ${logsData.data.length} 건 (최근 20개 표시)`);
+                        if (logsData.data.length === 0) {
+                            result.logs.push('✨ 현재 미해결된 에러가 없습니다.');
+                        } else {
+                            result.logs.push(`📊 미해결 에러: ${logsData.data.length} 건 (최근 20개 표시)`);
+                        }
                     }
                 }
             } catch (e) {
@@ -368,6 +393,48 @@ ${formattedResults || '모든 항목이 정상입니다.'}
     // 결과 초기화
     const handleReset = () => {
         setDiagnosisResults({});
+    };
+
+    // 에러 해결 처리
+    const handleResolveError = async (errorId, e) => {
+        if (e) e.stopPropagation(); // 다이얼로그 닫힘 방지 등
+        if (!errorId) return;
+
+        if (!window.confirm('이 에러를 해결 완료 처리하시겠습니까?\n해결 처리된 에러는 목록에서 사라지며, DB에 기록됩니다.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/errors/${errorId}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'resolved' })
+            });
+
+            if (response.ok) {
+                alert('✅ 에러가 해결 처리되었습니다.');
+
+                // 선택된 결과 업데이트 (해결된 에러 제거)
+                if (selectedResult) {
+                    const updatedResult = { ...selectedResult };
+                    updatedResult.errors = updatedResult.errors.filter(e => parseLogMessage(e).id !== errorId);
+                    updatedResult.warnings = updatedResult.warnings.filter(w => parseLogMessage(w).id !== errorId);
+
+                    setSelectedResult(updatedResult);
+
+                    // 전체 결과에도 반영
+                    setDiagnosisResults(prev => ({
+                        ...prev,
+                        [`${selectedResult.modeKey}_${selectedResult.tabKey}`]: updatedResult
+                    }));
+                }
+            } else {
+                alert('처리에 실패했습니다.');
+            }
+        } catch (error) {
+            console.error('Error resolving:', error);
+            alert('오류가 발생했습니다.');
+        }
     };
 
     // 상태 아이콘 렌더링
@@ -754,30 +821,62 @@ ${formattedResults || '모든 항목이 정상입니다.'}
                                 )}
                             </Paper>
 
-                            {/* 경고 */}
-                            {selectedResult.warnings.length > 0 && (
+                            {/* 에러 */}
+                            {selectedResult.errors.length > 0 && (
                                 <>
-                                    <Typography variant="subtitle2" color="warning.dark" gutterBottom>경고</Typography>
-                                    <Paper sx={{ p: 2, bgcolor: '#fff8e1', mb: 2, maxHeight: 150, overflow: 'auto' }}>
-                                        {selectedResult.warnings.map((warn, idx) => (
-                                            <Typography key={idx} variant="body2" sx={{ fontFamily: 'monospace', color: 'warning.dark' }}>
-                                                {warn}
-                                            </Typography>
-                                        ))}
+                                    <Typography variant="subtitle2" color="error" gutterBottom>에러 (미해결)</Typography>
+                                    <Paper sx={{ p: 2, bgcolor: '#ffebee', maxHeight: 300, overflow: 'auto' }}>
+                                        {selectedResult.errors.map((errStr, idx) => {
+                                            const { message, id } = parseLogMessage(errStr);
+                                            return (
+                                                <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 1, pb: 1, borderBottom: '1px solid #ffcdd2' }}>
+                                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', color: 'error.main', flex: 1, mr: 2 }}>
+                                                        {message}
+                                                    </Typography>
+                                                    {id && (
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            color="success"
+                                                            sx={{ minWidth: 60, height: 24, fontSize: '0.7rem', p: 0 }}
+                                                            onClick={(e) => handleResolveError(id, e)}
+                                                        >
+                                                            해결
+                                                        </Button>
+                                                    )}
+                                                </Box>
+                                            );
+                                        })}
                                     </Paper>
                                 </>
                             )}
 
-                            {/* 에러 */}
-                            {selectedResult.errors.length > 0 && (
+                            {/* 경고 */}
+                            {selectedResult.warnings.length > 0 && (
                                 <>
-                                    <Typography variant="subtitle2" color="error" gutterBottom>에러</Typography>
-                                    <Paper sx={{ p: 2, bgcolor: '#ffebee', maxHeight: 200, overflow: 'auto' }}>
-                                        {selectedResult.errors.map((err, idx) => (
-                                            <Typography key={idx} variant="body2" sx={{ fontFamily: 'monospace', color: 'error.main' }}>
-                                                {err}
-                                            </Typography>
-                                        ))}
+                                    <Typography variant="subtitle2" color="warning.dark" gutterBottom sx={{ mt: 2 }}>경고 (미해결)</Typography>
+                                    <Paper sx={{ p: 2, bgcolor: '#fff8e1', mb: 2, maxHeight: 200, overflow: 'auto' }}>
+                                        {selectedResult.warnings.map((warnStr, idx) => {
+                                            const { message, id } = parseLogMessage(warnStr);
+                                            return (
+                                                <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 1, pb: 1, borderBottom: '1px solid #ffe0b2' }}>
+                                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', color: 'warning.dark', flex: 1, mr: 2 }}>
+                                                        {message}
+                                                    </Typography>
+                                                    {id && (
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            color="success"
+                                                            sx={{ minWidth: 60, height: 24, fontSize: '0.7rem', p: 0 }}
+                                                            onClick={(e) => handleResolveError(id, e)}
+                                                        >
+                                                            해결
+                                                        </Button>
+                                                    )}
+                                                </Box>
+                                            );
+                                        })}
                                     </Paper>
                                 </>
                             )}
