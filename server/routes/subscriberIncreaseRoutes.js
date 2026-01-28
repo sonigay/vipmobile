@@ -32,7 +32,10 @@ function createSubscriberIncreaseRoutes(context) {
     try {
       if (!requireSheetsClient(res)) return;
       const values = await getSheetValues('가입자증감');
-      res.json(values.slice(1));
+      res.json({
+        success: true,
+        hasAccess: values.length > 1
+      });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -42,7 +45,7 @@ function createSubscriberIncreaseRoutes(context) {
   router.get('/api/subscriber-increase/data', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      
+
       const cacheKey = 'subscriber_increase_data';
       const cached = cacheManager.get(cacheKey);
       if (cached) return res.json(cached);

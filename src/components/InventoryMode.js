@@ -88,7 +88,7 @@ const PriceDiscrepancyTab = () => {
   useEffect(() => {
     fetchPriceDiscrepancies();
     setLastUpdate(new Date());
-    
+
     // 1시간마다 자동 새로고침
     const interval = setInterval(() => {
       fetchPriceDiscrepancies();
@@ -170,8 +170,8 @@ const PriceDiscrepancyTab = () => {
 
       {/* 콘텐츠 */}
       {!loading && data && (
-        <PriceDiscrepancyContent 
-          data={data} 
+        <PriceDiscrepancyContent
+          data={data}
           onExcelDownload={handleExcelDownload}
           getConfidenceColor={getConfidenceColor}
         />
@@ -264,18 +264,18 @@ const PriceDiscrepancyContent = memo(({ data, onExcelDownload, getConfidenceColo
                   <Typography variant="body1" fontWeight="bold" sx={{ minWidth: 200 }}>
                     {discrepancy.modelName}
                   </Typography>
-                  <Chip 
-                    label={`추천: ${Number(discrepancy.recommendedPrice).toLocaleString()}원`} 
-                    color="primary" 
+                  <Chip
+                    label={`추천: ${Number(discrepancy.recommendedPrice).toLocaleString()}원`}
+                    color="primary"
                     size="small"
                   />
-                  <Chip 
-                    label={`신뢰도: ${discrepancy.confidence}%`} 
+                  <Chip
+                    label={`신뢰도: ${discrepancy.confidence}%`}
                     color={getConfidenceColor(discrepancy.confidence)}
                     size="small"
                   />
-                  <Chip 
-                    label={`${discrepancy.items.length}개 항목`} 
+                  <Chip
+                    label={`${discrepancy.items.length}개 항목`}
                     size="small"
                     variant="outlined"
                   />
@@ -317,26 +317,26 @@ const PriceDiscrepancyContent = memo(({ data, onExcelDownload, getConfidenceColo
                       {discrepancy.items.map((item, itemIndex) => {
                         const normalizedPrice = item.inPrice.replace(/[,\s]/g, '');
                         const isWrongPrice = normalizedPrice !== discrepancy.recommendedPrice;
-                        
+
                         return (
-                          <TableRow 
+                          <TableRow
                             key={itemIndex}
-                            sx={{ 
+                            sx={{
                               backgroundColor: isWrongPrice ? '#FFEBEE' : 'transparent'
                             }}
                           >
                             <TableCell>
-                              <Chip 
-                                label={item.sheetName} 
-                                size="small" 
+                              <Chip
+                                label={item.sheetName}
+                                size="small"
                                 color={item.sheetName === '폰클재고데이터' ? 'secondary' : 'primary'}
                               />
                             </TableCell>
                             <TableCell>{item.modelName}</TableCell>
                             <TableCell>
-                              <Typography 
-                                variant="body2" 
-                                sx={{ 
+                              <Typography
+                                variant="body2"
+                                sx={{
                                   color: isWrongPrice ? 'error.main' : 'inherit',
                                   fontWeight: isWrongPrice ? 'bold' : 'normal'
                                 }}
@@ -414,7 +414,7 @@ const PhoneDuplicateTab = () => {
   useEffect(() => {
     fetchPhoneDuplicates();
     setLastUpdate(new Date());
-    
+
     // 1시간마다 자동 새로고침
     const interval = setInterval(() => {
       if (activeTab === 0) {
@@ -454,12 +454,12 @@ const PhoneDuplicateTab = () => {
 
       {/* 탭 네비게이션 */}
       <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }}>
-        <Tab 
+        <Tab
           label={`휴대폰 중복값 ${phoneData ? `(${phoneData.duplicates.length}개 그룹)` : ''}`}
           icon={<PhoneAndroidIcon />}
           iconPosition="start"
         />
-        <Tab 
+        <Tab
           label={`유심 중복값 ${simData ? `(${simData.duplicates.length}개 그룹)` : ''}`}
           icon={<SimCardIcon />}
           iconPosition="start"
@@ -503,9 +503,11 @@ const PhoneDuplicateContent = ({ data, type }) => {
   }
 
   // 등록직원 빈도순 정렬
-  const sortedEmployees = Object.entries(data.employeeFrequency)
-    .sort(([,a], [,b]) => b - a)
-    .slice(0, 5); // 상위 5명
+  const sortedEmployees = data.employeeFrequency
+    ? Object.entries(data.employeeFrequency)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5) // 상위 5명
+    : [];
 
   return (
     <Box>
@@ -573,9 +575,9 @@ const PhoneDuplicateContent = ({ data, type }) => {
             <Accordion key={index} sx={{ mb: 1 }}>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-                  <Chip 
-                    label={`${duplicate.count}개 중복`} 
-                    color="error" 
+                  <Chip
+                    label={`${duplicate.count}개 중복`}
+                    color="error"
                     size="small"
                   />
                   <Typography variant="body1" fontWeight="bold">
@@ -602,16 +604,16 @@ const PhoneDuplicateContent = ({ data, type }) => {
                       {duplicate.items.map((item, itemIndex) => (
                         <TableRow key={itemIndex}>
                           <TableCell>
-                            <Chip 
-                              label={item.type} 
-                              size="small" 
+                            <Chip
+                              label={item.type}
+                              size="small"
                               color={item.type === '개통' ? 'primary' : 'secondary'}
                             />
                           </TableCell>
                           <TableCell>{item.store}</TableCell>
                           <TableCell>
-                            <Chip 
-                              label={item.employee || '미등록'} 
+                            <Chip
+                              label={item.employee || '미등록'}
                               size="small"
                               color={data.employeeFrequency[item.employee] > 5 ? 'error' : 'default'}
                             />
@@ -682,10 +684,10 @@ const MasterInventoryTab = () => {
       </Box>
 
       {/* 서브 탭 네비게이션 */}
-      <Tabs 
-        value={activeTab} 
-        onChange={handleTabChange} 
-        sx={{ 
+      <Tabs
+        value={activeTab}
+        onChange={handleTabChange}
+        sx={{
           mb: 3,
           '& .MuiTab-root': {
             fontSize: '1rem',
@@ -701,13 +703,13 @@ const MasterInventoryTab = () => {
           }
         }}
       >
-        <Tab 
+        <Tab
           label="무선단말검수"
           icon={<PhoneAndroidIcon />}
           iconPosition="start"
           sx={{ textTransform: 'none' }}
         />
-        <Tab 
+        <Tab
           label="유심검수"
           icon={<SimCardIcon />}
           iconPosition="start"
@@ -745,7 +747,7 @@ const WirelessInventoryContent = ({ data, refreshTrigger }) => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [confirmedData, setConfirmedData] = useState([]);
   const [confirmedLoading, setConfirmedLoading] = useState(false);
-  
+
   // debounce를 위한 ref
   const debounceRef = useRef(null);
 
@@ -757,7 +759,7 @@ const WirelessInventoryContent = ({ data, refreshTrigger }) => {
       const url = `${process.env.REACT_APP_API_URL}/api/inventory-inspection${noCache ? `?t=${Date.now()}` : ''}`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
@@ -765,7 +767,7 @@ const WirelessInventoryContent = ({ data, refreshTrigger }) => {
         }
       });
       const result = await response.json();
-      
+
       if (result.success) {
         setInspectionData(result.data);
         setNormalizationMap(result.data.normalizationMap || {});
@@ -792,7 +794,7 @@ const WirelessInventoryContent = ({ data, refreshTrigger }) => {
         }
       });
       const result = await response.json();
-      
+
       if (result.success) {
         setConfirmedData(result.data);
       } else {
@@ -865,7 +867,7 @@ const WirelessInventoryContent = ({ data, refreshTrigger }) => {
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         setSnackbar({ open: true, message: `${selectedItems.length}개 항목이 확인처리되었습니다`, severity: 'success' });
         setSelectedItems([]);
@@ -886,7 +888,7 @@ const WirelessInventoryContent = ({ data, refreshTrigger }) => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
-    
+
     debounceRef.current = setTimeout(() => {
       setNormalizationMap(prev => ({
         ...prev,
@@ -905,7 +907,7 @@ const WirelessInventoryContent = ({ data, refreshTrigger }) => {
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         setSnackbar({ open: true, message: '모델명 정규화가 저장되었습니다', severity: 'success' });
         await loadInspectionData(true); // 캐시 무시하고 데이터 새로고침
@@ -940,13 +942,13 @@ const WirelessInventoryContent = ({ data, refreshTrigger }) => {
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={activeView} onChange={(e, v) => setActiveView(v)}>
           <Tab label="재고 검수" value="inspection" />
-          <Tab 
-            label={`모델명 정규화 ${inspectionData.needsNormalization.length > 0 ? `(${inspectionData.needsNormalization.length})` : ''}`} 
-            value="normalization" 
+          <Tab
+            label={`모델명 정규화 ${inspectionData.needsNormalization.length > 0 ? `(${inspectionData.needsNormalization.length})` : ''}`}
+            value="normalization"
           />
-          <Tab 
-            label={`확인된 재고 ${confirmedData.length > 0 ? `(${confirmedData.length})` : ''}`} 
-            value="confirmed" 
+          <Tab
+            label={`확인된 재고 ${confirmedData.length > 0 ? `(${confirmedData.length})` : ''}`}
+            value="confirmed"
           />
         </Tabs>
       </Box>
@@ -1024,7 +1026,7 @@ const WirelessInventoryContent = ({ data, refreshTrigger }) => {
                             item.dealerInDate
                           ])
                         ];
-                        
+
                         const csvContent = csvData.map(row => row.join(',')).join('\n');
                         const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
                         const link = document.createElement('a');
@@ -1053,7 +1055,7 @@ const WirelessInventoryContent = ({ data, refreshTrigger }) => {
                     </Button>
                   </Box>
                 </Box>
-                
+
                 <TableContainer>
                   <Table size="small">
                     <TableHead>
@@ -1129,7 +1131,7 @@ const WirelessInventoryContent = ({ data, refreshTrigger }) => {
                           item.phoneklData?.outStore || ''
                         ])
                       ];
-                      
+
                       const csvContent = csvData.map(row => row.join(',')).join('\n');
                       const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
                       const link = document.createElement('a');
@@ -1164,8 +1166,8 @@ const WirelessInventoryContent = ({ data, refreshTrigger }) => {
                           <TableCell>{item.outletCode}</TableCell>
                           <TableCell>{item.phoneklData?.modelName}</TableCell>
                           <TableCell>
-                            {item.phoneklData?.inPrice ? 
-                              Number(item.phoneklData.inPrice).toLocaleString() + '원' : 
+                            {item.phoneklData?.inPrice ?
+                              Number(item.phoneklData.inPrice).toLocaleString() + '원' :
                               '-'
                             }
                           </TableCell>
@@ -1268,7 +1270,7 @@ const WirelessInventoryContent = ({ data, refreshTrigger }) => {
                           item.status || '완료'
                         ])
                       ];
-                      
+
                       const csvContent = csvData.map(row => row.join(',')).join('\n');
                       const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
                       const link = document.createElement('a');
@@ -1328,8 +1330,8 @@ const WirelessInventoryContent = ({ data, refreshTrigger }) => {
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <Chip 
-                              label={item.status || '완료'} 
+                            <Chip
+                              label={item.status || '완료'}
                               color={item.status === '완료' ? 'success' : 'default'}
                               size="small"
                             />
@@ -1366,7 +1368,7 @@ const WirelessInventoryContent = ({ data, refreshTrigger }) => {
           }}
           onClick={() => setConfirmDialogOpen(false)}
         >
-          <Card 
+          <Card
             sx={{ width: 500, maxWidth: '90%' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1473,11 +1475,11 @@ const LoadingSkeleton = () => (
   </Box>
 );
 
-const InventoryMode = ({ 
-  loggedInStore, 
-  onLogout, 
-  onModeChange, 
-  availableModes 
+const InventoryMode = ({
+  loggedInStore,
+  onLogout,
+  onModeChange,
+  availableModes
 }) => {
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -1486,7 +1488,7 @@ const InventoryMode = ({
   const [selectedMenu, setSelectedMenu] = useState(null);
   const [currentScreen, setCurrentScreen] = useState('price-discrepancy');
   const [preloadedScreens, setPreloadedScreens] = useState(new Set());
-  
+
   // 검색 관련 상태
   const [searchType, setSearchType] = useState('store');
   const [searchTerm, setSearchTerm] = useState('');
@@ -1589,7 +1591,7 @@ const InventoryMode = ({
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
               재고 관리 시스템
             </Typography>
-            
+
             {/* 업데이트 확인 버튼 */}
             <Button
               color="inherit"
@@ -1604,7 +1606,7 @@ const InventoryMode = ({
             >
               업데이트 확인
             </Button>
-            
+
             {/* 모드 전환 버튼 - 2개 이상 권한이 있는 사용자에게만 표시 */}
             {onModeChange && availableModes && availableModes.length > 1 && (
               <Button
@@ -1622,7 +1624,7 @@ const InventoryMode = ({
                 모드 변경
               </Button>
             )}
-            
+
             <Button color="inherit" onClick={onLogout} sx={{ ml: 2 }}>
               로그아웃
             </Button>
@@ -1632,8 +1634,8 @@ const InventoryMode = ({
         {/* 탭 네비게이션 */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: 'white' }}>
           <Container maxWidth={false} sx={{ px: 2 }}>
-            <Tabs 
-              value={currentScreen} 
+            <Tabs
+              value={currentScreen}
               onChange={(event, newValue) => setCurrentScreen(newValue)}
               variant="scrollable"
               scrollButtons="auto"
@@ -1659,7 +1661,7 @@ const InventoryMode = ({
                 value="price-discrepancy"
                 icon={<CompareIcon />}
                 iconPosition="start"
-                sx={{ 
+                sx={{
                   textTransform: 'none',
                   minHeight: 64,
                   py: 1
@@ -1670,7 +1672,7 @@ const InventoryMode = ({
                 value="duplicate"
                 icon={<WarningIcon />}
                 iconPosition="start"
-                sx={{ 
+                sx={{
                   textTransform: 'none',
                   minHeight: 64,
                   py: 1
@@ -1681,7 +1683,7 @@ const InventoryMode = ({
                 value="master"
                 icon={<InventoryIcon />}
                 iconPosition="start"
-                sx={{ 
+                sx={{
                   textTransform: 'none',
                   minHeight: 64,
                   py: 1
@@ -1692,7 +1694,7 @@ const InventoryMode = ({
                 value="assignment"
                 icon={<AssignmentIcon />}
                 iconPosition="start"
-                sx={{ 
+                sx={{
                   textTransform: 'none',
                   minHeight: 64,
                   py: 1
@@ -1718,7 +1720,7 @@ const InventoryMode = ({
 
           {currentScreen === 'assignment' && (
             <Suspense fallback={<LoadingSkeleton />}>
-              <AssignmentSettingsScreen 
+              <AssignmentSettingsScreen
                 data={data}
                 onBack={() => setCurrentScreen('price-discrepancy')}
                 onLogout={onLogout}

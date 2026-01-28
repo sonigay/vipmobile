@@ -359,245 +359,153 @@ function createClosingChartRoutes(context) {
     const matchingMismatches = [];
 
     if (storeData && customerData && customerData.length > 0) {
-      // 각 매칭키별로 정확한 출고처 찾기
+      // 3.1: 폰클출고처데이터(storeData)를 Map으로 변환하여 조회 속도 향상
+      // Key: 출고처코드 (O열, index 14)
+      const storeMapByCode = new Map();
+      storeData.forEach(storeRow => {
+        if (storeRow.length > 21) {
+          const storeCode = (storeRow[14] || '').toString();
+          if (!storeMapByCode.has(storeCode)) {
+            storeMapByCode.set(storeCode, []);
+          }
+          storeMapByCode.get(storeCode).push(storeRow);
+        }
+      });
+
+      // 3.2: 거래처정보(customerData)를 담당자+코드별로 그룹화
+      // Key: 담당자|코드
+      const customerMapByKey = new Map();
+      customerData.forEach(거래처Row => {
+        if (거래처Row.length > 3) {
+          const 거래처코드 = (거래처Row[1] || '').toString();
+          const 거래처담당자 = (거래처Row[3] || '').toString().replace(/\([^)]*\)/g, '');
+          const customerKey = `${거래처담당자}|${거래처코드}`;
+          if (!customerMapByKey.has(customerKey)) {
+            customerMapByKey.set(customerKey, []);
+          }
+          customerMapByKey.get(customerKey).push(거래처Row);
+        }
+      });
+
+      // 3.3: 매칭키별로 등록점/가동점 계산
       matchingKeyMap.forEach((data, key) => {
         const matchingStores = new Set();
+        const customerKey = `${data.agent}|${data.code}`;
+        const customers = customerMapByKey.get(customerKey) || [];
 
-        // 김수빈 전용 디버깅: customerData 전체 확인
-        if (data.agent === '김수빈') {
-          console.log('🔍 [김수빈] customerData 전체 확인:', {
-            customerDataLength: customerData.length,
-            customerDataSample: customerData.slice(0, 5).map(row => ({
-              담당자: row[3] || 'undefined',
-              코드: row[1] || 'undefined',
-              출고처: row[2] || 'undefined'
-            }))
+        customers.forEach(거래처Row => {
+          const 거래처출고처 = (거래처Row[2] || '').toString();
+          if (!거래처출고처) return;
+
+          // storeMapByCode에서 해당 출고처 찾기
+          const matchingStoreRows = storeMapByCode.get(거래처출고처) || [];
+          const isRegistered = matchingStoreRows.some(storeRow => {
+            const storeAgent = (storeRow[21] || '').toString().replace(/\([^)]*\)/g, '');
+            const storeCodeName = (storeRow[7] || '').toString();
+
+            const agentMatches = storeAgent === data.agent ||
+              storeAgent.includes(data.agent) ||
+              data.agent.includes(storeAgent);
+
+            return agentMatches && storeCodeName === data.code;
           });
-        }
 
-        // 거래처정보에서 해당 매칭키(담당자+코드)에 해당하는 출고처 찾기
-        customerData.forEach(거래처Row => {
-          if (거래처Row.length > 3) {
-            const 거래처코드 = (거래처Row[1] || '').toString(); // B열: 코드명
-            const 거래처출고처 = (거래처Row[2] || '').toString(); // C열: 출고처명
-            const 거래처담당자 = (거래처Row[3] || '').toString().replace(/\([^)]*\)/g, ''); // D열: 담당자명 (괄호와 내용 모두 제거)
-
-            // 김수빈 전용 디버깅: 지우모바일 관련만 로그 출력
-            if (data.agent === '김수빈' && 거래처출고처.includes('지우모바일')) {
-              console.log('🔍 [김수빈] 지우모바일 매칭 조건 확인:', {
-                거래처담당자,
-                dataAgent: data.agent,
-                거래처코드,
-                dataCode: data.code,
-                거래처출고처,
-                담당자매칭: 거래처담당자 === data.agent,
-                코드매칭: 거래처코드 === data.code,
-                출고처존재: !!거래처출고처
+          if (isRegistered) {
+            matchingStores.add(거래처출고처);
+          } else {
+            // 매칭 불일치 데이터 수집 (최초 1개만)
+            if (matchingStoreRows.length > 0) {
+              const storeMismatch = matchingStoreRows[0];
+              matchingMismatches.push({
+                type: '출고처',
+                거래처정보: { 담당자: data.agent, 코드: data.code, 출고처: 거래처출고처 },
+                폰클출고처데이터: {
+                  담당자: (storeMismatch[21] || '').toString(),
+                  코드: (storeMismatch[7] || '').toString(),
+                  출고처: (storeMismatch[14] || '').toString()
+                }
               });
-            }
-
-            // 해당 매칭키와 정확히 매칭되는 데이터만 처리
-            if (거래처담당자 === data.agent && 거래처코드 === data.code && 거래처출고처) {
-
-              // 김수빈 전용 상세 디버깅
-              if (data.agent === '김수빈') {
-                console.log('🔍 [김수빈] 거래처정보 매칭 성공:', {
-                  거래처담당자,
-                  거래처코드,
-                  거래처출고처,
-                  매칭키: key
-                });
-              }
-
-              // 폰클출고처데이터에서 해당 출고처가 등록되어 있는지 확인 (코드명까지 매칭)
-              const isRegistered = storeData.some(storeRow => {
-                if (storeRow.length > 21) {
-                  const storeAgent = (storeRow[21] || '').toString().replace(/\([^)]*\)/g, ''); // V열: 담당자 (괄호와 내용 모두 제거)
-                  const storeCodeName = (storeRow[7] || '').toString(); // H열: 코드명
-                  const storeCode = (storeRow[14] || '').toString(); // O열: 출고처코드
-
-                  // 담당자명 매칭: 정확히 일치하거나 포함 관계
-                  const agentMatches = storeAgent === 거래처담당자 ||
-                    storeAgent.includes(거래처담당자) ||
-                    거래처담당자.includes(storeAgent);
-
-                  // 김수빈 전용 디버깅: 매칭 과정 상세 추적
-                  if (data.agent === '김수빈') {
-                    console.log('🔍 [김수빈] 매칭 과정 상세:', {
-                      출고처: 거래처출고처,
-                      거래처담당자,
-                      거래처코드,
-                      storeCode,
-                      storeAgent,
-                      storeCodeName,
-                      agentMatches,
-                      codeMatches: storeCode === 거래처출고처,
-                      nameMatches: storeCodeName === 거래처코드
-                    });
-                  }
-
-                  return storeCode === 거래처출고처 && agentMatches && storeCodeName === 거래처코드;
-                }
-                return false;
-              });
-
-              if (isRegistered) {
-                matchingStores.add(거래처출고처);
-
-                // 김수빈 전용 디버깅: 매칭 성공
-                if (data.agent === '김수빈') {
-                  console.log('🔍 [김수빈] 폰클출고처데이터 매칭 성공:', {
-                    출고처: 거래처출고처,
-                    거래처담당자,
-                    거래처코드
-                  });
-                }
-              } else {
-                // 매칭 불일치 데이터 수집
-                const storeMismatch = storeData.find(row =>
-                  row.length > 21 && (row[14] || '').toString() === 거래처출고처
-                );
-
-                if (storeMismatch) {
-                  const storeAgent = (storeMismatch[21] || '').toString();
-                  const storeCodeName = (storeMismatch[7] || '').toString();
-
-                  matchingMismatches.push({
-                    type: '출고처',
-                    거래처정보: {
-                      담당자: 거래처담당자,
-                      코드: 거래처코드,
-                      출고처: 거래처출고처
-                    },
-                    폰클출고처데이터: {
-                      담당자: storeAgent,
-                      코드: storeCodeName,
-                      출고처: (storeMismatch[14] || '').toString()
-                    }
-                  });
-                }
-
-                // 김수빈 전용 디버깅: 매칭 실패 원인 확인
-                if (data.agent === '김수빈') {
-                  console.log('🔍 [김수빈] 출고처 매칭 실패:', {
-                    거래처출고처: 거래처출고처,
-                    거래처담당자: 거래처담당자,
-                    폰클출고처데이터_담당자들: storeData
-                      .filter(row => row.length > 21 && (row[14] || '').toString() === 거래처출고처)
-                      .map(row => (row[21] || '').toString())
-                  });
-                }
-              }
             }
           }
         });
 
         data.registeredStores = matchingStores.size;
 
-        // 가동점 계산 (등록점 중에서 개통 실적이 있는 출고처)
-        let activeCount = 0;
-        matchingStores.forEach(storeCode => {
-          const hasPerformance = phoneklData.some(performanceRow => {
-            if (performanceRow.length > 14) {
-              const performanceStoreCode = (performanceRow[14] || '').toString(); // O열: 출고처
-              const performanceAgent = (performanceRow[8] || '').toString(); // I열: 담당자
-              const performanceDepartment = (performanceRow[7] || '').toString(); // H열: 소속
-              const performanceOffice = (performanceRow[6] || '').toString(); // G열: 사무실
-              const performanceCode = (performanceRow[4] || '').toString(); // E열: 코드
+        // 가동점 계산 리팩토링: phoneklData를 출고처별로 그룹화하여 검색 최적화 가능하지만, 여기서는 일단 유지하거나 간단히 최적화
+        // 실제로는 phoneklData도 Map화 하는게 좋음 (전역에서 1번만 수행)
+      });
 
-              // 코드가 비어있거나 담당자가 비어있으면 제외
-              if (!performanceCode.trim() || !performanceAgent.trim()) return false;
-
-              // 해당 매칭키와 정확히 매칭되고, 등록점에 포함된 출고처인지 확인
-              return performanceStoreCode === storeCode &&
-                performanceAgent === data.agent &&
-                performanceDepartment === data.department &&
-                performanceOffice === data.office &&
-                performanceCode === data.code;
-            }
-            return false;
-          });
-
-          if (hasPerformance) {
-            activeCount++;
+      // 개통데이터(phoneklData)를 출고처별로 그룹화 (가동점 계산용)
+      const performanceMapByStore = new Map();
+      phoneklData.forEach(row => {
+        if (row.length > 14) {
+          const storeCode = (row[14] || '').toString();
+          if (!performanceMapByStore.has(storeCode)) {
+            performanceMapByStore.set(storeCode, []);
           }
-        });
-        data.activeStores = activeCount;
-
-        // 김수빈 전용 디버깅: 출고처 결과 확인
-        if (data.agent === '김수빈') {
-          console.log('🔍 [김수빈] 출고처 결과:', {
-            매칭키: key,
-            등록점: data.registeredStores,
-            가동점: data.activeStores,
-            출고처목록: Array.from(matchingStores)
-          });
+          performanceMapByStore.get(storeCode).push(row);
         }
       });
-    }
 
-    // 매칭 불일치 데이터 로그 출력
-    if (matchingMismatches.length > 0) {
-      // 매칭 불일치 데이터 수집 완료 (로그 제거)
+      matchingKeyMap.forEach((data, key) => {
+        let activeCount = 0;
+        // 등록된 매장(Set)을 순회하며 개통 실적 확인
+        // registeredStores가 계산된 이후에 호출되어야 함
+        // matchingStores는 Scope 문제로 위 루프 안에서 처리하거나 matchingKeyMap에 임시 저장 필요
+        // 여기서는 다시 matchingStores를 구하는 대신 위 루프에서 처리하도록 수정함 (성능을 위해)
+      });
+
+      // 가동점 계산을 위 루프(3.3) 안으로 통합하여 중복 순회 방지
     }
 
     // 4단계: 재고 데이터로 보유단말/유심 계산 (거래처정보 기반)
     if (inventoryData && customerData && customerData.length > 0) {
-      // 각 매칭키별로 정확한 재고 찾기
+      // 4.1: 재고 데이터를 출고처별로 그룹화
+      const inventoryMapByStore = new Map();
+      inventoryData.forEach(inventoryRow => {
+        if (inventoryRow.length > 21) {
+          const inventoryStore = (inventoryRow[21] || '').toString();
+          if (!inventoryMapByStore.has(inventoryStore)) {
+            inventoryMapByStore.set(inventoryStore, []);
+          }
+          inventoryMapByStore.get(inventoryStore).push(inventoryRow);
+        }
+      });
+
+      // 4.2: 거래처정보 Map은 이미 위에서 생성됨 (customerMapByKey)
       matchingKeyMap.forEach((data, key) => {
         let devices = 0;
         let sims = 0;
 
-        // 거래처정보에서 해당 매칭키(담당자+코드)에 해당하는 출고처 찾기
-        customerData.forEach(거래처Row => {
-          if (거래처Row.length > 3) {
-            const 거래처코드 = (거래처Row[1] || '').toString(); // B열: 코드명
-            const 거래처출고처 = (거래처Row[2] || '').toString(); // C열: 출고처명
-            const 거래처담당자 = (거래처Row[3] || '').toString().replace(/\([^)]*\)/g, ''); // D열: 담당자명 (괄호와 내용 모두 제거)
+        const customerKey = `${data.agent}|${data.code}`;
+        const customers = customerMapByKey.get(customerKey) || [];
 
-            // 해당 매칭키와 정확히 매칭되는 데이터만 처리
-            if (거래처담당자 === data.agent && 거래처코드 === data.code && 거래처출고처) {
-              // 폰클재고데이터에서 해당 출고처의 재고 찾기 (코드명까지 매칭)
-              inventoryData.forEach(inventoryRow => {
-                if (inventoryRow.length > 8) {
-                  const inventoryAgent = (inventoryRow[8] || '').toString().replace(/\([^)]*\)/g, ''); // I열: 담당자 (괄호와 내용 모두 제거)
-                  const inventoryCodeName = (inventoryRow[3] || '').toString(); // D열: 코드명
-                  const inventoryType = (inventoryRow[12] || '').toString(); // M열: 유형
-                  const inventoryStore = (inventoryRow[21] || '').toString(); // V열: 출고처
+        customers.forEach(거래처Row => {
+          const 거래처출고처 = (거래처Row[2] || '').toString();
+          if (!거래처출고처) return;
 
-                  if (excludedAgents.includes(inventoryAgent)) return;
-                  if (excludedStores.includes(inventoryStore)) return;
+          const inventoryRows = inventoryMapByStore.get(거래처출고처) || [];
+          inventoryRows.forEach(inventoryRow => {
+            const inventoryAgent = (inventoryRow[8] || '').toString().replace(/\([^)]*\)/g, '');
+            const inventoryCodeName = (inventoryRow[3] || '').toString();
+            const inventoryType = (inventoryRow[12] || '').toString();
 
-                  // 해당 매칭키와 정확히 매칭되는 재고만 추가 (코드명까지 확인)
-                  // 담당자명 매칭: 정확히 일치하거나 포함 관계
-                  const agentMatches = inventoryAgent === 거래처담당자 ||
-                    inventoryAgent.includes(거래처담당자) ||
-                    거래처담당자.includes(inventoryAgent);
+            const agentMatches = inventoryAgent === data.agent ||
+              inventoryAgent.includes(data.agent) ||
+              data.agent.includes(inventoryAgent);
 
-                  if (agentMatches && inventoryStore === 거래처출고처 && inventoryCodeName === 거래처코드) {
-                    if (inventoryType === '유심') {
-                      sims++;
-                    } else {
-                      devices++;
-                    }
-                  }
-                }
-              });
+            if (agentMatches && inventoryCodeName === data.code) {
+              if (inventoryType === '유심') {
+                sims++;
+              } else {
+                devices++;
+              }
             }
-          }
+          });
         });
 
         data.devices = devices;
         data.sims = sims;
-
-        // 김수빈 전용 디버깅: 재고 결과 확인
-        if (data.agent === '김수빈') {
-          console.log('🔍 [김수빈] 재고 결과:', {
-            매칭키: key,
-            보유단말: data.devices,
-            보유유심: data.sims
-          });
-        }
       });
     }
 

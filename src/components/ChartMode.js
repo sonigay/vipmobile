@@ -110,20 +110,20 @@ const calculateTotal = (dataArray, field) => {
 
 function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, presentationMode = false, initialTab = 0, initialSubTab, detailOptions, csDetailType, csDetailCriteria }) {
   const [activeTab, setActiveTab] = useState(initialTab);
-  
+
   // 업데이트 팝업 상태
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
-  
+
   // 매칭 불일치 모달 상태
   const [showMismatchModal, setShowMismatchModal] = useState(false);
   const [matchingMismatches, setMatchingMismatches] = useState([]);
-  
+
   // 장표모드 진입 시 업데이트 팝업 표시 (숨김 설정 확인 후)
   useEffect(() => {
     // 오늘 하루 보지 않기 설정 확인
     const hideUntil = localStorage.getItem('hideUpdate_chart');
     const shouldShowPopup = !(hideUntil && new Date() < new Date(hideUntil));
-    
+
     if (shouldShowPopup) {
       // 숨김 설정이 없거나 만료된 경우에만 팝업 표시
       setShowUpdatePopup(true);
@@ -149,21 +149,21 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, pres
     {
       label: '마감장표',
       icon: <ReceiptIcon />,
-      component: <ClosingChartTab 
-        initialSubTab={initialSubTab} 
-        presentationMode={presentationMode} 
+      component: <ClosingChartTab
+        initialSubTab={initialSubTab}
+        presentationMode={presentationMode}
         detailOptions={detailOptions}
-        csDetailType={detailOptions?.csDetailType || csDetailType} 
-        csDetailCriteria={detailOptions?.csDetailCriteria || csDetailCriteria} 
+        csDetailType={detailOptions?.csDetailType || csDetailType}
+        csDetailCriteria={detailOptions?.csDetailCriteria || csDetailCriteria}
       />,
       hasPermission: true // 마감장표 탭은 모든 사용자에게 표시
     },
     {
       label: '채권장표',
       icon: <AccountBalanceIcon />,
-      component: <BondChartTab 
-        loggedInStore={loggedInStore} 
-        initialSubTab={initialSubTab} 
+      component: <BondChartTab
+        loggedInStore={loggedInStore}
+        initialSubTab={initialSubTab}
         presentationMode={presentationMode}
         detailOptions={detailOptions}
       />,
@@ -198,7 +198,7 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, pres
               <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
                 장표 모드
               </Typography>
-              
+
               {/* 모드 전환 버튼 - 2개 이상 권한이 있는 사용자에게만 표시 */}
               {onModeChange && availableModes && availableModes.length > 1 && (
                 <Button
@@ -210,7 +210,7 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, pres
                     onModeChange();
                   }}
                   startIcon={<SwapHorizIcon />}
-                  sx={{ 
+                  sx={{
                     mr: 2,
                     backgroundColor: 'rgba(255,255,255,0.1)',
                     '&:hover': {
@@ -221,13 +221,13 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, pres
                   모드 변경
                 </Button>
               )}
-              
+
               {/* 업데이트 확인 버튼 */}
               <Button
                 color="inherit"
                 startIcon={<UpdateIcon />}
                 onClick={() => setShowUpdatePopup(true)}
-                sx={{ 
+                sx={{
                   mr: 2,
                   backgroundColor: 'rgba(255,255,255,0.1)',
                   '&:hover': {
@@ -237,7 +237,7 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, pres
               >
                 업데이트 확인
               </Button>
-              
+
               <Button color="inherit" onClick={onLogout}>
                 로그아웃
               </Button>
@@ -247,8 +247,8 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, pres
           {/* 탭 네비게이션 */}
           <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: 'white' }}>
             <Container maxWidth={false} sx={{ px: 2 }}>
-              <Tabs 
-                value={activeTab} 
+              <Tabs
+                value={activeTab}
                 onChange={handleTabChange}
                 variant="scrollable"
                 scrollButtons="auto"
@@ -275,7 +275,7 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, pres
                     label={tab.label}
                     icon={tab.icon}
                     iconPosition="start"
-                    sx={{ 
+                    sx={{
                       textTransform: 'none',
                       minHeight: 64,
                       py: 1
@@ -287,7 +287,7 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, pres
           </Box>
         </>
       )}
-      
+
       {/* 탭 컨텐츠 */}
       <Container maxWidth={false} sx={{ flex: 1, py: presentationMode ? 0 : 3, overflow: 'auto', px: presentationMode ? 0 : 2 }}>
         {/* 업데이트 팝업 */}
@@ -302,7 +302,7 @@ function ChartMode({ onLogout, loggedInStore, onModeChange, availableModes, pres
             }}
           />
         )}
-        
+
         {availableTabs[activeTab].component}
       </Container>
     </Box>
@@ -327,84 +327,8 @@ function BondChartTab({ loggedInStore, initialSubTab = 0, presentationMode = fal
     <Box>
       {/* 서브 탭 네비게이션 */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs 
-          value={activeSubTab} 
-          onChange={handleSubTabChange}
-          variant="scrollable"
-          scrollButtons="auto"
-                sx={{
-            '& .MuiTab-root': {
-              minHeight: 56,
-              fontSize: '0.9rem',
-              fontWeight: 'bold',
-              color: '#666',
-              '&.Mui-selected': {
-                color: '#f5576c',
-                fontWeight: 'bold'
-              }
-            },
-            '& .MuiTabs-indicator': {
-              backgroundColor: '#f5576c',
-              height: 3
-            }
-          }}
-        >
-          {subTabs.map((tab, index) => (
-            <Tab
-              key={index}
-              label={tab.label}
-              icon={tab.icon}
-              iconPosition="start"
-                  sx={{
-                textTransform: 'none',
-                minHeight: 56,
-                py: 1
-              }}
-            />
-          ))}
-        </Tabs>
-      </Box>
-
-      {/* 서브 탭 컨텐츠 */}
-      {activeSubTab === 0 && <OverdueBondTab />}
-      {activeSubTab === 1 && (
-        <RechotanchoBondTab 
-          loggedInStore={loggedInStore} 
-          presentationMode={presentationMode} 
-          initialSubTab={initialSubTab} 
-        />
-      )}
-      {activeSubTab === 2 && (
-        <SubscriberIncreaseTab 
-          presentationMode={presentationMode} 
-          detailOptions={detailOptions} 
-        />
-      )}
-    </Box>
-  );
-}
-
-// 지표장표 탭 컴포넌트
-function IndicatorChartTab() {
-  const [activeSubTab, setActiveSubTab] = useState(0);
-
-  const subTabs = [
-    { label: '월간시상', icon: <TrendingUpIcon /> },
-    { label: '매출지표', icon: <AssessmentIcon /> },
-    { label: '판매량', icon: <ShowChartIcon /> },
-    { label: '구조정책', icon: <PieChartIcon /> }
-  ];
-
-  const handleSubTabChange = (event, newValue) => {
-    setActiveSubTab(newValue);
-  };
-
-  return (
-    <Box>
-      {/* 서브 탭 네비게이션 */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs 
-          value={activeSubTab} 
+        <Tabs
+          value={activeSubTab}
           onChange={handleSubTabChange}
           variant="scrollable"
           scrollButtons="auto"
@@ -431,7 +355,83 @@ function IndicatorChartTab() {
               label={tab.label}
               icon={tab.icon}
               iconPosition="start"
-              sx={{ 
+              sx={{
+                textTransform: 'none',
+                minHeight: 56,
+                py: 1
+              }}
+            />
+          ))}
+        </Tabs>
+      </Box>
+
+      {/* 서브 탭 컨텐츠 */}
+      {activeSubTab === 0 && <OverdueBondTab />}
+      {activeSubTab === 1 && (
+        <RechotanchoBondTab
+          loggedInStore={loggedInStore}
+          presentationMode={presentationMode}
+          initialSubTab={initialSubTab}
+        />
+      )}
+      {activeSubTab === 2 && (
+        <SubscriberIncreaseTab
+          presentationMode={presentationMode}
+          detailOptions={detailOptions}
+        />
+      )}
+    </Box>
+  );
+}
+
+// 지표장표 탭 컴포넌트
+function IndicatorChartTab() {
+  const [activeSubTab, setActiveSubTab] = useState(0);
+
+  const subTabs = [
+    { label: '월간시상', icon: <TrendingUpIcon /> },
+    { label: '매출지표', icon: <AssessmentIcon /> },
+    { label: '판매량', icon: <ShowChartIcon /> },
+    { label: '구조정책', icon: <PieChartIcon /> }
+  ];
+
+  const handleSubTabChange = (event, newValue) => {
+    setActiveSubTab(newValue);
+  };
+
+  return (
+    <Box>
+      {/* 서브 탭 네비게이션 */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs
+          value={activeSubTab}
+          onChange={handleSubTabChange}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{
+            '& .MuiTab-root': {
+              minHeight: 56,
+              fontSize: '0.9rem',
+              fontWeight: 'bold',
+              color: '#666',
+              '&.Mui-selected': {
+                color: '#f5576c',
+                fontWeight: 'bold'
+              }
+            },
+            '& .MuiTabs-indicator': {
+              backgroundColor: '#f5576c',
+              height: 3
+            }
+          }}
+        >
+          {subTabs.map((tab, index) => (
+            <Tab
+              key={index}
+              label={tab.label}
+              icon={tab.icon}
+              iconPosition="start"
+              sx={{
                 textTransform: 'none',
                 minHeight: 56,
                 py: 1
@@ -461,10 +461,10 @@ function MonthlyAwardTab() {
   const [isDepartmentTableExpanded, setIsDepartmentTableExpanded] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState(0); // 셋팅 다이얼로그에서 현재 탭 상태 관리
-  
+
   // Matrix 기준값 상태
   const [matrixValues, setMatrixValues] = useState({});
-  
+
   // 추가 전략상품 상태
   const [newStrategicProduct, setNewStrategicProduct] = useState({
     subCategory: '',
@@ -479,7 +479,7 @@ function MonthlyAwardTab() {
         setLoading(true);
         const result = await api.getMonthlyAwardData();
         setData(result);
-        
+
         // Matrix 기준값 초기화
         if (result.matrixCriteria) {
           const initialMatrixValues = {};
@@ -504,10 +504,10 @@ function MonthlyAwardTab() {
   // Matrix 셀 색상 계산
   const getMatrixCellColor = (score, percentage) => {
     if (!data?.matrixCriteria) return '#ffffff';
-    
+
     const criteria = data.matrixCriteria.find(c => c.score === score);
     if (!criteria) return '#ffffff';
-    
+
     const targetPercentage = criteria.percentage;
     if (percentage >= targetPercentage) return '#4caf50'; // 녹색
     if (percentage >= targetPercentage * 0.8) return '#ff9800'; // 주황색
@@ -517,14 +517,14 @@ function MonthlyAwardTab() {
   // 성과 아이콘 계산 (시트에서 로드된 기준값 사용)
   const getPerformanceIcon = (percentage, indicator) => {
     if (!data?.matrixCriteria) return '⚠️';
-    
+
     // 해당 지표의 최고 점수 기준값 찾기
     const maxCriteria = data.matrixCriteria
       .filter(c => c.indicator === indicator)
       .sort((a, b) => b.score - a.score)[0];
-    
+
     if (!maxCriteria) return '⚠️';
-    
+
     if (percentage >= maxCriteria.percentage) return '🏆';
     if (percentage >= maxCriteria.percentage * 0.8) return '👍';
     return '⚠️';
@@ -533,14 +533,14 @@ function MonthlyAwardTab() {
   // 달성 상태 텍스트 생성
   const getAchievementText = (percentage, indicator) => {
     if (!data?.matrixCriteria) return '미달';
-    
+
     // 해당 지표의 최고 점수 기준값 찾기
     const maxCriteria = data.matrixCriteria
       .filter(c => c.indicator === indicator)
       .sort((a, b) => b.score - a.score)[0];
-    
+
     if (!maxCriteria) return '미달';
-    
+
     if (percentage >= maxCriteria.percentage) {
       return '달성';
     } else {
@@ -552,10 +552,10 @@ function MonthlyAwardTab() {
   // 점수 계산 함수 (백엔드와 동일한 로직)
   const calculateScore = (percentage, criteria) => {
     if (!criteria || criteria.length === 0) return 0;
-    
+
     // 기준값을 점수별로 정렬
     const sortedCriteria = [...criteria].sort((a, b) => b.score - a.score);
-    
+
     for (const criterion of sortedCriteria) {
       if (criterion.description === '미만') {
         // 미만 조건: 해당 퍼센트 미만이면 해당 점수
@@ -574,7 +574,7 @@ function MonthlyAwardTab() {
         }
       }
     }
-    
+
     // 모든 조건을 만족하지 않으면 최소 점수 반환
     const minScore = Math.min(...criteria.map(c => c.score));
     return minScore;
@@ -599,18 +599,18 @@ function MonthlyAwardTab() {
       ];
 
       await api.saveMonthlyAwardSettings('strategic_products', updatedProducts);
-      
+
       // 데이터 새로고침
       const result = await api.getMonthlyAwardData();
       setData(result);
-      
+
       // 입력 필드 초기화
       setNewStrategicProduct({
         subCategory: '',
         serviceName: '',
         points: 0
       });
-      
+
       alert('전략상품이 추가되었습니다.');
     } catch (error) {
       alert('전략상품 추가 중 오류가 발생했습니다: ' + error.message);
@@ -669,7 +669,7 @@ function MonthlyAwardTab() {
             </Button>
           </Box>
         </Box>
-        
+
         <Grid container spacing={2}>
           <Grid item xs={12} md={3}>
             <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
@@ -712,7 +712,7 @@ function MonthlyAwardTab() {
           <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: '#333' }}>
             월간시상 Matrix
           </Typography>
-          
+
           {/* 만점기준 */}
           <Box sx={{ mb: 3 }}>
             <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#333' }}>
@@ -776,97 +776,97 @@ function MonthlyAwardTab() {
 
                 </Box>
               </Grid>
-            <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fff3e0', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold' }}>
-                  {getPerformanceIcon(data.indicators.change105Above.percentage, 'change105')}
-                  {calculateScore(parseFloat(data.indicators.change105Above.percentage), data.matrixCriteria?.filter(c => c.indicator === 'change105') || [])}점
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  기변105이상
-                </Typography>
+              <Grid item xs={12} md={2.4}>
+                <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fff3e0', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <Typography variant="h6" sx={{ color: '#f57c00', fontWeight: 'bold' }}>
+                    {getPerformanceIcon(data.indicators.change105Above.percentage, 'change105')}
+                    {calculateScore(parseFloat(data.indicators.change105Above.percentage), data.matrixCriteria?.filter(c => c.indicator === 'change105') || [])}점
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    기변105이상
+                  </Typography>
 
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#f3e5f5', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Typography variant="h6" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>
-                  {getPerformanceIcon(data.indicators.strategicProducts.percentage, 'strategic')}
-                  {calculateScore(parseFloat(data.indicators.strategicProducts.percentage), data.matrixCriteria?.filter(c => c.indicator === 'strategic') || [])}점
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  전략상품
-                </Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={12} md={2.4}>
+                <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#f3e5f5', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <Typography variant="h6" sx={{ color: '#7b1fa2', fontWeight: 'bold' }}>
+                    {getPerformanceIcon(data.indicators.strategicProducts.percentage, 'strategic')}
+                    {calculateScore(parseFloat(data.indicators.strategicProducts.percentage), data.matrixCriteria?.filter(c => c.indicator === 'strategic') || [])}점
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    전략상품
+                  </Typography>
 
-              </Box>
+                </Box>
+              </Grid>
+              <Grid item xs={12} md={2.4}>
+                <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fce4ec', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <Typography variant="h6" sx={{ color: '#c2185b', fontWeight: 'bold' }}>
+                    {getPerformanceIcon(data.indicators.internetRatio.percentage, 'internet')}
+                    {calculateScore(parseFloat(data.indicators.internetRatio.percentage), data.matrixCriteria?.filter(c => c.indicator === 'internet') || [])}점
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    인터넷 비중
+                  </Typography>
+                </Box>
+              </Grid>
             </Grid>
-            <Grid item xs={12} md={2.4}>
-              <Box sx={{ textAlign: 'center', py: 1, bgcolor: '#fce4ec', borderRadius: 1, height: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Typography variant="h6" sx={{ color: '#c2185b', fontWeight: 'bold' }}>
-                  {getPerformanceIcon(data.indicators.internetRatio.percentage, 'internet')}
-                  {calculateScore(parseFloat(data.indicators.internetRatio.percentage), data.matrixCriteria?.filter(c => c.indicator === 'internet') || [])}점
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  인터넷 비중
-                </Typography>
-              </Box>
-            </Grid>
-          </Grid>
-        </Box>
+          </Box>
 
-        {/* Matrix 테이블 */}
-        <Collapse in={isExpanded}>
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>점수</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>업셀기변</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>기변105이상</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>전략상품</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>인터넷 비중</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {[6, 5, 4, 3, 2, 1].map((score) => {
-                  const upsellCriteria = data.matrixCriteria?.find(c => c.score === score && c.indicator === 'upsell');
-                  const change105Criteria = data.matrixCriteria?.find(c => c.score === score && c.indicator === 'change105');
-                  const strategicCriteria = data.matrixCriteria?.find(c => c.score === score && c.indicator === 'strategic');
-                  const internetCriteria = data.matrixCriteria?.find(c => c.score === score && c.indicator === 'internet');
-                  
-                  const isUpsellAchieved = upsellCriteria && parseFloat(data.indicators.upsellChange.percentage) >= upsellCriteria.percentage;
-                  const isChange105Achieved = change105Criteria && parseFloat(data.indicators.change105Above.percentage) >= change105Criteria.percentage;
-                  const isStrategicAchieved = strategicCriteria && parseFloat(data.indicators.strategicProducts.percentage) >= strategicCriteria.percentage;
-                  const isInternetAchieved = internetCriteria && parseFloat(data.indicators.internetRatio.percentage) >= internetCriteria.percentage;
-                  
-                  return (
-                    <TableRow key={score}>
-                      <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{score}점</TableCell>
-                      <TableCell sx={{ textAlign: 'center', bgcolor: isUpsellAchieved ? '#e8f5e8' : 'transparent' }}>
-                        {upsellCriteria?.percentage || 0}%
-                        {isUpsellAchieved && <span style={{ marginLeft: '8px', color: '#2e7d32' }}>✓</span>}
-                      </TableCell>
-                      <TableCell sx={{ textAlign: 'center', bgcolor: isChange105Achieved ? '#fff3e0' : 'transparent' }}>
-                        {change105Criteria?.percentage || 0}%
-                        {isChange105Achieved && <span style={{ marginLeft: '8px', color: '#f57c00' }}>✓</span>}
-                      </TableCell>
-                      <TableCell sx={{ textAlign: 'center', bgcolor: isStrategicAchieved ? '#f3e5f5' : 'transparent' }}>
-                        {strategicCriteria?.percentage || 0}%
-                        {isStrategicAchieved && <span style={{ marginLeft: '8px', color: '#7b1fa2' }}>✓</span>}
-                      </TableCell>
-                      <TableCell sx={{ textAlign: 'center', bgcolor: isInternetAchieved ? '#fce4ec' : 'transparent' }}>
-                        {internetCriteria?.percentage || 0}%
-                        {isInternetAchieved && <span style={{ marginLeft: '8px', color: '#c2185b' }}>✓</span>}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Collapse>
-      </Paper>
-        </Collapse>
+          {/* Matrix 테이블 */}
+          <Collapse in={isExpanded}>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>점수</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>업셀기변</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>기변105이상</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>전략상품</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>인터넷 비중</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {[6, 5, 4, 3, 2, 1].map((score) => {
+                    const upsellCriteria = data.matrixCriteria?.find(c => c.score === score && c.indicator === 'upsell');
+                    const change105Criteria = data.matrixCriteria?.find(c => c.score === score && c.indicator === 'change105');
+                    const strategicCriteria = data.matrixCriteria?.find(c => c.score === score && c.indicator === 'strategic');
+                    const internetCriteria = data.matrixCriteria?.find(c => c.score === score && c.indicator === 'internet');
+
+                    const isUpsellAchieved = upsellCriteria && parseFloat(data.indicators.upsellChange.percentage) >= upsellCriteria.percentage;
+                    const isChange105Achieved = change105Criteria && parseFloat(data.indicators.change105Above.percentage) >= change105Criteria.percentage;
+                    const isStrategicAchieved = strategicCriteria && parseFloat(data.indicators.strategicProducts.percentage) >= strategicCriteria.percentage;
+                    const isInternetAchieved = internetCriteria && parseFloat(data.indicators.internetRatio.percentage) >= internetCriteria.percentage;
+
+                    return (
+                      <TableRow key={score}>
+                        <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{score}점</TableCell>
+                        <TableCell sx={{ textAlign: 'center', bgcolor: isUpsellAchieved ? '#e8f5e8' : 'transparent' }}>
+                          {upsellCriteria?.percentage || 0}%
+                          {isUpsellAchieved && <span style={{ marginLeft: '8px', color: '#2e7d32' }}>✓</span>}
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'center', bgcolor: isChange105Achieved ? '#fff3e0' : 'transparent' }}>
+                          {change105Criteria?.percentage || 0}%
+                          {isChange105Achieved && <span style={{ marginLeft: '8px', color: '#f57c00' }}>✓</span>}
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'center', bgcolor: isStrategicAchieved ? '#f3e5f5' : 'transparent' }}>
+                          {strategicCriteria?.percentage || 0}%
+                          {isStrategicAchieved && <span style={{ marginLeft: '8px', color: '#7b1fa2' }}>✓</span>}
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'center', bgcolor: isInternetAchieved ? '#fce4ec' : 'transparent' }}>
+                          {internetCriteria?.percentage || 0}%
+                          {isInternetAchieved && <span style={{ marginLeft: '8px', color: '#c2185b' }}>✓</span>}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Collapse>
+        </Paper>
+      </Collapse>
 
       {/* 상세 데이터 테이블 */}
       <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden', mb: 3 }}>
@@ -900,9 +900,9 @@ function MonthlyAwardTab() {
                   data.agentDetails.map((agent, index) => (
                     <TableRow key={index}>
                       <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{agent.name}</TableCell>
-                      <TableCell sx={{ 
-                        textAlign: 'center', 
-                        bgcolor: parseFloat(agent.upsellChange.percentage) >= 92.0 ? 'transparent' : '#ffebee' 
+                      <TableCell sx={{
+                        textAlign: 'center',
+                        bgcolor: parseFloat(agent.upsellChange.percentage) >= 92.0 ? 'transparent' : '#ffebee'
                       }}>
                         <Box>
                           <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
@@ -910,9 +910,9 @@ function MonthlyAwardTab() {
                           </Typography>
                         </Box>
                       </TableCell>
-                      <TableCell sx={{ 
-                        textAlign: 'center', 
-                        bgcolor: parseFloat(agent.change105Above.percentage) >= 88.0 ? 'transparent' : '#ffebee' 
+                      <TableCell sx={{
+                        textAlign: 'center',
+                        bgcolor: parseFloat(agent.change105Above.percentage) >= 88.0 ? 'transparent' : '#ffebee'
                       }}>
                         <Box>
                           <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
@@ -920,9 +920,9 @@ function MonthlyAwardTab() {
                           </Typography>
                         </Box>
                       </TableCell>
-                      <TableCell sx={{ 
-                        textAlign: 'center', 
-                        bgcolor: parseFloat(agent.strategicProducts.percentage) >= 90.0 ? 'transparent' : '#ffebee' 
+                      <TableCell sx={{
+                        textAlign: 'center',
+                        bgcolor: parseFloat(agent.strategicProducts.percentage) >= 90.0 ? 'transparent' : '#ffebee'
                       }}>
                         <Box>
                           <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
@@ -930,9 +930,9 @@ function MonthlyAwardTab() {
                           </Typography>
                         </Box>
                       </TableCell>
-                      <TableCell sx={{ 
-                        textAlign: 'center', 
-                        bgcolor: parseFloat(agent.internetRatio.percentage) >= 7.0 ? 'transparent' : '#ffebee' 
+                      <TableCell sx={{
+                        textAlign: 'center',
+                        bgcolor: parseFloat(agent.internetRatio.percentage) >= 7.0 ? 'transparent' : '#ffebee'
                       }}>
                         <Box>
                           <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
@@ -974,68 +974,68 @@ function MonthlyAwardTab() {
             </Button>
           </Box>
           <Collapse in={isOfficeTableExpanded}>
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>사무실</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>업셀기변</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>기변105이상</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>전략상품</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>인터넷 비중</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {data.officeGroups.map((group, index) => (
-                  <TableRow key={index}>
-                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{group.office}</TableCell>
-                    <TableCell sx={{ 
-                      textAlign: 'center', 
-                      bgcolor: parseFloat(group.totalUpsellChange.percentage) >= 92.0 ? 'transparent' : '#ffebee' 
-                    }}>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                          {group.totalUpsellChange.percentage}%
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell sx={{ 
-                      textAlign: 'center', 
-                      bgcolor: parseFloat(group.totalChange105Above.percentage) >= 88.0 ? 'transparent' : '#ffebee' 
-                    }}>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                          {group.totalChange105Above.percentage}%
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell sx={{ 
-                      textAlign: 'center', 
-                      bgcolor: parseFloat(group.totalStrategicProducts.percentage) >= 90.0 ? 'transparent' : '#ffebee' 
-                    }}>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                          {group.totalStrategicProducts.percentage}%
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell sx={{ 
-                      textAlign: 'center', 
-                      bgcolor: parseFloat(group.totalInternetRatio.percentage) >= 7.0 ? 'transparent' : '#ffebee' 
-                    }}>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                          {group.totalInternetRatio.percentage}%
-                        </Typography>
-                      </Box>
-                    </TableCell>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>사무실</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>업셀기변</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>기변105이상</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>전략상품</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>인터넷 비중</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Collapse>
-      </Paper>
+                </TableHead>
+                <TableBody>
+                  {data.officeGroups.map((group, index) => (
+                    <TableRow key={index}>
+                      <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{group.office}</TableCell>
+                      <TableCell sx={{
+                        textAlign: 'center',
+                        bgcolor: parseFloat(group.totalUpsellChange.percentage) >= 92.0 ? 'transparent' : '#ffebee'
+                      }}>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            {group.totalUpsellChange.percentage}%
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{
+                        textAlign: 'center',
+                        bgcolor: parseFloat(group.totalChange105Above.percentage) >= 88.0 ? 'transparent' : '#ffebee'
+                      }}>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            {group.totalChange105Above.percentage}%
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{
+                        textAlign: 'center',
+                        bgcolor: parseFloat(group.totalStrategicProducts.percentage) >= 90.0 ? 'transparent' : '#ffebee'
+                      }}>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            {group.totalStrategicProducts.percentage}%
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{
+                        textAlign: 'center',
+                        bgcolor: parseFloat(group.totalInternetRatio.percentage) >= 7.0 ? 'transparent' : '#ffebee'
+                      }}>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            {group.totalInternetRatio.percentage}%
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Collapse>
+        </Paper>
       )}
 
       {/* 소속별 성과 테이블 */}
@@ -1055,68 +1055,68 @@ function MonthlyAwardTab() {
             </Button>
           </Box>
           <Collapse in={isDepartmentTableExpanded}>
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>소속</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>업셀기변</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>기변105이상</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>전략상품</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>인터넷 비중</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {data.departmentGroups.map((group, index) => (
-                  <TableRow key={index}>
-                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{group.department}</TableCell>
-                    <TableCell sx={{ 
-                      textAlign: 'center', 
-                      bgcolor: parseFloat(group.totalUpsellChange.percentage) >= 92.0 ? 'transparent' : '#ffebee' 
-                    }}>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                          {group.totalUpsellChange.percentage}%
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell sx={{ 
-                      textAlign: 'center', 
-                      bgcolor: parseFloat(group.totalChange105Above.percentage) >= 88.0 ? 'transparent' : '#ffebee' 
-                    }}>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                          {group.totalChange105Above.percentage}%
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell sx={{ 
-                      textAlign: 'center', 
-                      bgcolor: parseFloat(group.totalStrategicProducts.percentage) >= 90.0 ? 'transparent' : '#ffebee' 
-                    }}>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                          {group.totalStrategicProducts.percentage}%
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell sx={{ 
-                      textAlign: 'center', 
-                      bgcolor: parseFloat(group.totalInternetRatio.percentage) >= 7.0 ? 'transparent' : '#ffebee' 
-                    }}>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                          {group.totalInternetRatio.percentage}%
-                        </Typography>
-                      </Box>
-                    </TableCell>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>소속</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>업셀기변</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>기변105이상</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>전략상품</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', width: '20%' }}>인터넷 비중</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Collapse>
-      </Paper>
+                </TableHead>
+                <TableBody>
+                  {data.departmentGroups.map((group, index) => (
+                    <TableRow key={index}>
+                      <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>{group.department}</TableCell>
+                      <TableCell sx={{
+                        textAlign: 'center',
+                        bgcolor: parseFloat(group.totalUpsellChange.percentage) >= 92.0 ? 'transparent' : '#ffebee'
+                      }}>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            {group.totalUpsellChange.percentage}%
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{
+                        textAlign: 'center',
+                        bgcolor: parseFloat(group.totalChange105Above.percentage) >= 88.0 ? 'transparent' : '#ffebee'
+                      }}>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            {group.totalChange105Above.percentage}%
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{
+                        textAlign: 'center',
+                        bgcolor: parseFloat(group.totalStrategicProducts.percentage) >= 90.0 ? 'transparent' : '#ffebee'
+                      }}>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            {group.totalStrategicProducts.percentage}%
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{
+                        textAlign: 'center',
+                        bgcolor: parseFloat(group.totalInternetRatio.percentage) >= 7.0 ? 'transparent' : '#ffebee'
+                      }}>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            {group.totalInternetRatio.percentage}%
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Collapse>
+        </Paper>
       )}
 
       {/* 셋팅 다이얼로그 */}
@@ -1135,7 +1135,7 @@ function MonthlyAwardTab() {
           {settingsTab === 0 && (
             <Box>
               <Typography variant="h6" sx={{ mb: 2 }}>Matrix 기준값 설정</Typography>
-              
+
               {/* 업셀기변 기준값 */}
               <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold', color: '#2e7d32' }}>업셀기변 기준값</Typography>
               <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -1278,12 +1278,12 @@ function MonthlyAwardTab() {
           {settingsTab === 1 && (
             <Box>
               <Typography variant="h6" sx={{ mb: 2 }}>전략상품 포인트 설정</Typography>
-              
+
               <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
                 <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>매칭 규칙</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  • 1순위: 부가서비스명과 정확히 일치하는 경우<br/>
-                  • 2순위: 소분류와 일치하는 경우<br/>
+                  • 1순위: 부가서비스명과 정확히 일치하는 경우<br />
+                  • 2순위: 소분류와 일치하는 경우<br />
                   • 소분류와 부가서비스명을 모두 설정할 수 있습니다
                 </Typography>
               </Paper>
@@ -1369,9 +1369,9 @@ function MonthlyAwardTab() {
                   />
                 </Grid>
                 <Grid item xs={12} md={1}>
-                  <Button 
-                    variant="outlined" 
-                    fullWidth 
+                  <Button
+                    variant="outlined"
+                    fullWidth
                     sx={{ height: 56 }}
                     onClick={handleAddStrategicProduct}
                     disabled={!newStrategicProduct.subCategory || !newStrategicProduct.serviceName || newStrategicProduct.points <= 0}
@@ -1388,8 +1388,8 @@ function MonthlyAwardTab() {
                     data.strategicProductsList.map((product, index) => (
                       <Box key={index} sx={{ mb: 1, p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}>
                         <Typography variant="body2">
-                          <strong>소분류:</strong> {product.subCategory} | 
-                          <strong>부가서비스명:</strong> {product.serviceName} | 
+                          <strong>소분류:</strong> {product.subCategory} |
+                          <strong>부가서비스명:</strong> {product.serviceName} |
                           <strong>포인트:</strong> {product.points}
                         </Typography>
                       </Box>
@@ -1431,12 +1431,12 @@ function MonthlyAwardTab() {
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                 개통데이터/홈데이터의 업체명과 폰클출고처데이터의 업체명이 일치하지 않는 경우를 관리합니다.
               </Typography>
-              
+
               <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
                 <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>매핑 규칙</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  • 개통데이터/홈데이터 G열(업체명) ↔ 폰클출고처데이터 C열(출고처 업체명)<br/>
-                  • 정확한 업체명 매칭이 필요한 경우에만 사용합니다<br/>
+                  • 개통데이터/홈데이터 G열(업체명) ↔ 폰클출고처데이터 C열(출고처 업체명)<br />
+                  • 정확한 업체명 매칭이 필요한 경우에만 사용합니다<br />
                   • 매칭되지 않은 업체는 인터넷 비중 계산에서 제외됩니다
                 </Typography>
               </Paper>
@@ -1498,12 +1498,12 @@ function MonthlyAwardTab() {
           {settingsTab === 2 && (
             <Box>
               <Typography variant="h6" sx={{ mb: 2 }}>인터넷 비중 업체명 매핑</Typography>
-              
+
               <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
                 <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>매핑 규칙</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  • 개통데이터/홈데이터 G열(업체명) ↔ 폰클출고처데이터 C열(출고처 업체명)<br/>
-                  • 정확한 업체명 매칭이 필요한 경우에만 사용합니다<br/>
+                  • 개통데이터/홈데이터 G열(업체명) ↔ 폰클출고처데이터 C열(출고처 업체명)<br />
+                  • 정확한 업체명 매칭이 필요한 경우에만 사용합니다<br />
                   • 매칭되지 않은 업체는 인터넷 비중 계산에서 제외됩니다
                 </Typography>
               </Paper>
@@ -1566,12 +1566,12 @@ function MonthlyAwardTab() {
           {settingsTab === 3 && (
             <Box>
               <Typography variant="h6" sx={{ mb: 2 }}>요금제 매핑 설정</Typography>
-              
+
               <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
                 <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>매핑 규칙</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  • 수기초에 있는 요금제명이 무선요금제군에 없을 때 매핑 설정<br/>
-                  • 요금제군과 기본료를 설정하여 업셀기변, 기변105이상 계산에 사용<br/>
+                  • 수기초에 있는 요금제명이 무선요금제군에 없을 때 매핑 설정<br />
+                  • 요금제군과 기본료를 설정하여 업셀기변, 기변105이상 계산에 사용<br />
                   • 매핑되지 않은 요금제는 계산에서 제외됩니다
                 </Typography>
               </Paper>
@@ -1643,7 +1643,7 @@ function MonthlyAwardTab() {
           {settingsTab === 4 && (
             <Box>
               <Typography variant="h6" sx={{ mb: 2 }}>담당자별 설정</Typography>
-              
+
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 <Grid item xs={12} md={6}>
                   <TextField
@@ -1680,7 +1680,7 @@ function MonthlyAwardTab() {
               <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>담당자 목록</Typography>
               <Paper elevation={1} sx={{ p: 2 }}>
                 <Typography variant="body2" color="text.secondary">
-                  담당자 매핑 테이블에서 관리됩니다. Google Sheets에서 직접 수정하거나<br/>
+                  담당자 매핑 테이블에서 관리됩니다. Google Sheets에서 직접 수정하거나<br />
                   위의 매핑 기능을 통해 자동으로 관리할 수 있습니다.
                 </Typography>
               </Paper>
@@ -1749,7 +1749,7 @@ function MonthlyAwardTab() {
                 // 담당자 관리 데이터 수집 (실제 구현 시 입력 필드에서 데이터 가져오기)
                 await api.saveMonthlyAwardSettings('manager_settings', managerSettings);
               }
-              
+
               alert('설정이 저장되었습니다.');
               setShowSettings(false);
               // 데이터 다시 로드
@@ -1767,10 +1767,10 @@ function MonthlyAwardTab() {
 // 매출지표 탭 컴포넌트
 function SalesIndicatorTab() {
   return (
-    <Paper 
-      elevation={3} 
-      sx={{ 
-        p: 4, 
+    <Paper
+      elevation={3}
+      sx={{
+        p: 4,
         textAlign: 'center',
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         color: 'white',
@@ -1795,10 +1795,10 @@ function SalesIndicatorTab() {
 // 판매량 탭 컴포넌트
 function SalesVolumeTab() {
   return (
-    <Paper 
-      elevation={3} 
-      sx={{ 
-        p: 4, 
+    <Paper
+      elevation={3}
+      sx={{
+        p: 4,
         textAlign: 'center',
         background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
         color: 'white',
@@ -1823,10 +1823,10 @@ function SalesVolumeTab() {
 // 구조정책 탭 컴포넌트
 function StructurePolicyTab() {
   return (
-    <Paper 
-      elevation={3} 
-      sx={{ 
-        p: 4, 
+    <Paper
+      elevation={3}
+      sx={{
+        p: 4,
         textAlign: 'center',
         background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
         color: 'white',
@@ -1851,7 +1851,7 @@ function StructurePolicyTab() {
 // 마감장표 탭 컴포넌트
 function ClosingChartTab({ initialSubTab = 0, presentationMode = false, detailOptions, csDetailType, csDetailCriteria }) {
   const [activeSubTab, setActiveSubTab] = useState(initialSubTab);
-  
+
   // initialSubTab이 변경되면 activeSubTab 업데이트
   React.useEffect(() => {
     if (initialSubTab !== undefined && initialSubTab !== activeSubTab) {
@@ -1859,7 +1859,7 @@ function ClosingChartTab({ initialSubTab = 0, presentationMode = false, detailOp
       setActiveSubTab(initialSubTab);
     }
   }, [initialSubTab]);
-  
+
   const handleSubTabChange = (event, newValue) => {
     setActiveSubTab(newValue);
   };
@@ -1867,9 +1867,9 @@ function ClosingChartTab({ initialSubTab = 0, presentationMode = false, detailOp
   const subTabs = [
     {
       label: '전체총마감',
-      component: <TotalClosingTab 
+      component: <TotalClosingTab
         detailOptions={detailOptions}
-        csDetailType={detailOptions?.csDetailType || csDetailType} 
+        csDetailType={detailOptions?.csDetailType || csDetailType}
         csDetailCriteria={detailOptions?.csDetailCriteria || csDetailCriteria}
         presentationMode={presentationMode}
       />
@@ -1885,8 +1885,8 @@ function ClosingChartTab({ initialSubTab = 0, presentationMode = false, detailOp
       {/* 서브 탭 네비게이션 - presentation mode에서는 숨김 */}
       {!presentationMode && (
         <Box sx={{ borderBottom: 1, borderColor: 'divider', backgroundColor: 'white' }}>
-          <Tabs 
-            value={activeSubTab} 
+          <Tabs
+            value={activeSubTab}
             onChange={handleSubTabChange}
             sx={{
               '& .MuiTab-root': {
@@ -1909,7 +1909,7 @@ function ClosingChartTab({ initialSubTab = 0, presentationMode = false, detailOp
               <Tab
                 key={index}
                 label={tab.label}
-                sx={{ 
+                sx={{
                   textTransform: 'none',
                   minHeight: 48,
                   py: 1
@@ -1919,7 +1919,7 @@ function ClosingChartTab({ initialSubTab = 0, presentationMode = false, detailOp
           </Tabs>
         </Box>
       )}
-      
+
       {/* 서브 탭 컨텐츠 */}
       <Box sx={{ pt: presentationMode ? 0 : 2 }}>
         {subTabs[activeSubTab].component}
@@ -1938,11 +1938,11 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
   const [showTargetModal, setShowTargetModal] = useState(false);
   const [showMappingModal, setShowMappingModal] = useState(false);
   const [mappingFailures, setMappingFailures] = useState([]);
-  
+
   // 매칭 불일치 모달 상태
   const [showMismatchModal, setShowMismatchModal] = useState(false);
   const [matchingMismatches, setMatchingMismatches] = useState([]);
-  
+
   // 테이블 접기/펼치기 상태 - presentationMode일 때는 자동으로 펼치기
   // propCsDetailType에 따라 해당 테이블도 자동 펼치기
   const shouldOpenCodeTable = presentationMode || propCsDetailType === 'code';
@@ -1950,17 +1950,17 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
   const shouldOpenDepartmentTable = presentationMode || propCsDetailType === 'department';
   const shouldOpenAgentTable = presentationMode || propCsDetailType === 'agent';
   const shouldOpenCsSummary = presentationMode || (propCsDetailType !== undefined && propCsDetailType !== 'all');
-  
+
   const [codeTableOpen, setCodeTableOpen] = useState(shouldOpenCodeTable);
   const [officeTableOpen, setOfficeTableOpen] = useState(shouldOpenOfficeTable);
   const [departmentTableOpen, setDepartmentTableOpen] = useState(shouldOpenDepartmentTable);
   const [agentTableOpen, setAgentTableOpen] = useState(shouldOpenAgentTable);
   const [csSummaryOpen, setCsSummaryOpen] = useState(shouldOpenCsSummary);
-  
+
   // CS 개통 실적 세부 옵션 상태 (props에서 받거나 기본값 사용)
   const [csDetailType, setCsDetailType] = useState(propCsDetailType || 'all'); // 'all', 'code', 'office', 'department', 'agent'
   const [csDetailCriteria, setCsDetailCriteria] = useState(propCsDetailCriteria || 'performance'); // 'performance' or 'fee'
-  
+
   // props가 변경되면 상태 업데이트
   React.useEffect(() => {
     if (propCsDetailType !== undefined) {
@@ -1986,7 +1986,7 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
       setCsDetailCriteria(propCsDetailCriteria);
     }
   }, [propCsDetailType, propCsDetailCriteria]);
-  
+
   // presentationMode나 propCsDetailType 변경 시 테이블 상태 업데이트
   React.useEffect(() => {
     if (presentationMode) {
@@ -2003,7 +2003,7 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
       setCsSummaryOpen(propCsDetailType !== 'all');
     }
   }, [presentationMode, propCsDetailType]);
-  
+
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [dataRendered, setDataRendered] = useState(false); // 실제 데이터 렌더링 완료 여부
@@ -2016,37 +2016,37 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
       setDataRendered(false);
       return;
     }
-    
+
     if (!containerRef.current) {
       // containerRef가 없으면 다음 렌더 사이클에서 다시 시도
       return;
     }
-    
+
     // 데이터가 있는지 확인
-    const hasData = data.csSummary || 
-                    (data.codeData && data.codeData.length > 0) ||
-                    (data.officeData && data.officeData.length > 0) ||
-                    (data.departmentData && data.departmentData.length > 0) ||
-                    (data.agentData && data.agentData.length > 0);
-    
+    const hasData = data.csSummary ||
+      (data.codeData && data.codeData.length > 0) ||
+      (data.officeData && data.officeData.length > 0) ||
+      (data.departmentData && data.departmentData.length > 0) ||
+      (data.agentData && data.agentData.length > 0);
+
     if (!hasData) {
       setDataRendered(false);
       return;
     }
-    
+
     // 여러 번 확인하여 확실하게 데이터가 렌더링되었는지 확인
     let checkCount = 0;
     const maxChecks = 40; // 최대 20초 (40 * 500ms) - 더 긴 대기
     let stableCount = 0;
     const requiredStableCount = 10; // 5초 동안 안정적이어야 함 (10 * 500ms)
-    
+
     const checkRender = () => {
       checkCount++;
-      
+
       // 실제 테이블 행이 있는지 확인 (최소 3개 이상의 데이터 행 - 로딩 화면과 구분)
       const tableRows = containerRef.current.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr');
       const hasTableRows = tableRows.length >= 3; // 최소 3개 행 필요
-      
+
       // 담당자별 실적 테이블이 펼쳐져 있는 경우, 해당 테이블의 행도 확인
       let hasAgentTableRows = false;
       if (agentTableOpen || propCsDetailType === 'agent') {
@@ -2057,45 +2057,45 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
           hasAgentTableRows = agentTableRows.length >= 1; // 담당자별 실적 테이블에 최소 1개 행
         }
       }
-      
+
       // Paper 컴포넌트가 있고 내용이 있는지 확인
       const hasPaper = containerRef.current.querySelector('.MuiPaper-root') !== null;
-      
+
       // 로딩 인디케이터가 없는지 확인
       const loadingIndicators = containerRef.current.querySelectorAll('.MuiCircularProgress-root, .MuiLinearProgress-root, [class*="loading"], [class*="Loading"]');
       const hasNoLoadingIndicator = loadingIndicators.length === 0;
-      
+
       // 프로그레스 바가 없는지 확인
       const progressBars = containerRef.current.querySelectorAll('.MuiLinearProgress-root, [class*="progress"]');
       const hasNoProgressBar = progressBars.length === 0;
-      
+
       // 로딩 텍스트가 없는지 확인
       const allText = containerRef.current.textContent || '';
-      const hasNoLoadingText = !allText.includes('로딩') && 
-                               !allText.includes('불러오는 중') && 
-                               !allText.includes('데이터를 불러오는 중') &&
-                               !allText.includes('마감장표 데이터 로딩 중') &&
-                               !allText.includes('데이터 로딩 중');
-      
+      const hasNoLoadingText = !allText.includes('로딩') &&
+        !allText.includes('불러오는 중') &&
+        !allText.includes('데이터를 불러오는 중') &&
+        !allText.includes('마감장표 데이터 로딩 중') &&
+        !allText.includes('데이터 로딩 중');
+
       // 실제 데이터 텍스트가 있는지 확인 (숫자, 한글 등)
       const hasDataText = /[\d가-힣]/.test(allText) && allText.length > 100; // 최소 100자 이상의 텍스트
-      
+
       // 담당자별 실적이 선택된 경우, 해당 테이블이 렌더링되었는지 확인
-      const agentTableReady = propCsDetailType === 'agent' 
+      const agentTableReady = propCsDetailType === 'agent'
         ? (hasAgentTableRows || hasTableRows) // 담당자별 실적 테이블 또는 일반 테이블
         : true; // 담당자별 실적이 선택되지 않은 경우는 항상 true
-      
+
       // 모든 조건이 만족되면 데이터 렌더링 완료
-      const isReady = (hasTableRows || (hasPaper && hasDataText)) && 
-                      hasNoLoadingIndicator && 
-                      hasNoProgressBar &&
-                      hasNoLoadingText &&
-                      hasDataText &&
-                      agentTableReady;
-      
+      const isReady = (hasTableRows || (hasPaper && hasDataText)) &&
+        hasNoLoadingIndicator &&
+        hasNoProgressBar &&
+        hasNoLoadingText &&
+        hasDataText &&
+        agentTableReady;
+
       if (isReady) {
         stableCount++;
-        
+
         // 연속으로 안정적인 상태가 5초 이상 유지되면 완료
         if (stableCount >= requiredStableCount) {
           setDataRendered(true);
@@ -2106,7 +2106,7 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
         if (stableCount > 0) {
           stableCount = 0;
         }
-        
+
         if (checkCount < maxChecks) {
           setTimeout(checkRender, 500);
         } else {
@@ -2119,7 +2119,7 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
         }
       }
     };
-    
+
     // 첫 확인은 3초 후에 시작 (DOM 업데이트 시간 충분히 확보)
     // presentationMode일 때는 더 긴 대기 시간 필요 (권한 확인 등 추가 시간)
     const initialDelay = presentationMode ? 5000 : 3000;
@@ -2158,30 +2158,30 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
       }
 
       const result = await response.json();
-      
+
       // 데이터가 실제로 있는지 확인
-      const hasRealData = result.csSummary || 
-                          (result.codeData && result.codeData.length > 0) ||
-                          (result.officeData && result.officeData.length > 0) ||
-                          (result.departmentData && result.departmentData.length > 0) ||
-                          (result.agentData && result.agentData.length > 0);
-      
+      const hasRealData = result.csSummary ||
+        (result.codeData && result.codeData.length > 0) ||
+        (result.officeData && result.officeData.length > 0) ||
+        (result.departmentData && result.departmentData.length > 0) ||
+        (result.agentData && result.agentData.length > 0);
+
       if (!hasRealData) {
         console.warn('⚠️ [TotalClosingTab] 로드된 데이터에 실제 내용이 없습니다.');
       }
-      
+
       setData(result);
-      
+
       // 매칭 불일치 데이터 처리
       if (result.matchingMismatches && result.matchingMismatches.length > 0) {
         setMatchingMismatches(result.matchingMismatches);
         setShowMismatchModal(true);
       }
-      
+
       setLastUpdate(new Date());
       setProgress(100);
       clearInterval(progressInterval);
-      
+
       // 데이터 설정 후 약간의 지연을 두고 loading을 false로 설정 (DOM 업데이트 시간 확보)
       // 최소 2초 대기하여 데이터가 완전히 렌더링되도록 함
       setTimeout(() => {
@@ -2261,29 +2261,29 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
   // 합계 일치 여부 확인
   const checkTotalConsistency = () => {
     if (!data) return true;
-    
+
     const codeTotal = calculateTotal(data?.codeData, 'performance');
     const officeTotal = calculateTotal(data?.officeData, 'performance');
     const departmentTotal = calculateTotal(data?.departmentData, 'performance');
     const agentTotal = calculateTotal(data?.agentData, 'performance');
-    
+
     return codeTotal === officeTotal && officeTotal === departmentTotal && departmentTotal === agentTotal;
   };
 
   if (loading && progress > 0) {
     return (
-      <Box 
-        sx={{ p: 4, textAlign: 'center' }} 
-        data-loading="true" 
+      <Box
+        sx={{ p: 4, textAlign: 'center' }}
+        data-loading="true"
         data-loaded="false"
         data-capture-exclude="true"
       >
         <Typography variant="h6" sx={{ mb: 2 }} data-capture-exclude="true">
           마감장표 데이터 로딩 중...
         </Typography>
-        <LinearProgress 
-          variant="determinate" 
-          value={progress} 
+        <LinearProgress
+          variant="determinate"
+          value={progress}
           sx={{ height: 8, borderRadius: 4, mb: 2 }}
           data-capture-exclude="true"
         />
@@ -2308,9 +2308,9 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
 
   if (!data) {
     return (
-      <Box 
-        sx={{ p: 4, textAlign: 'center' }} 
-        data-loading="true" 
+      <Box
+        sx={{ p: 4, textAlign: 'center' }}
+        data-loading="true"
         data-loaded="false"
         data-capture-exclude="true"
       >
@@ -2323,10 +2323,10 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
   }
 
   return (
-    <Box 
+    <Box
       ref={containerRef}
-      sx={{ p: 2 }} 
-      data-loaded={dataRendered && data && !loading ? 'true' : 'false'} 
+      sx={{ p: 2 }}
+      data-loaded={dataRendered && data && !loading ? 'true' : 'false'}
       data-loading={loading ? 'true' : 'false'}
     >
       {/* 상단 컨트롤 */}
@@ -2350,7 +2350,7 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
               새로고침
             </Button>
           </Box>
-          
+
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Button
               variant="outlined"
@@ -2399,7 +2399,7 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
               {csSummaryOpen ? '접기' : '펼치기'}
             </Button>
           </Box>
-          
+
           {!csSummaryOpen && (
             <Box sx={{ p: 2, textAlign: 'center' }}>
               <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#FFD700' }}>
@@ -2408,7 +2408,7 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
               <Typography variant="body2">총 개통</Typography>
             </Box>
           )}
-          
+
           <Collapse in={csSummaryOpen}>
             <Box sx={{ p: 2 }}>
               {/* 총계 카드 */}
@@ -2448,8 +2448,8 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
                   <Grid container spacing={1}>
                     {data.csSummary.agents.map((agent, index) => (
                       <Grid item xs={12} sm={6} md={4} key={index}>
-                        <Paper sx={{ 
-                          p: 1.5, 
+                        <Paper sx={{
+                          p: 1.5,
                           background: index < 3 ? 'rgba(255,215,0,0.2)' : 'rgba(255,255,255,0.1)',
                           border: index < 3 ? '2px solid #FFD700' : '1px solid rgba(255,255,255,0.3)',
                           borderRadius: 2
@@ -2489,8 +2489,8 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
       {/* 랭킹 기준 탭 - presentationMode가 아니거나 세부 옵션이 선택된 경우에만 표시 */}
       {(!presentationMode || propCsDetailType) && (
         <Paper sx={{ mb: 2 }}>
-          <Tabs 
-            value={rankingType} 
+          <Tabs
+            value={rankingType}
             onChange={(e, newValue) => setRankingType(newValue)}
             sx={{ borderBottom: 1, borderColor: 'divider' }}
           >
@@ -2502,240 +2502,240 @@ function TotalClosingTab({ detailOptions, csDetailType: propCsDetailType, csDeta
 
       {/* 코드별 실적 테이블 - 세부 옵션이 'code'이거나 선택되지 않았거나 presentationMode일 때만 표시 */}
       {(!propCsDetailType || propCsDetailType === 'code' || propCsDetailType === 'all' || presentationMode) && (
-      <Paper sx={{ 
-        mb: 2, 
-        borderRadius: 2,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        overflow: 'hidden'
-      }}>
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between', 
-          p: 2, 
-          background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
-          color: 'white'
-        }}>
-          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-            📊 코드별 실적
-          </Typography>
-          <Button
-            size="small"
-            onClick={() => setCodeTableOpen(!codeTableOpen)}
-            startIcon={codeTableOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            sx={{ 
-              color: 'white', 
-              borderColor: 'white',
-              '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
-            }}
-            variant="outlined"
-          >
-            {codeTableOpen ? '접기' : '펼치기'}
-          </Button>
-        </Box>
-        {!codeTableOpen && (
-          <Box sx={{ 
-            p: 3, 
-            textAlign: 'center',
-            background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)'
-          }}>
-            <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#4CAF50', mb: 1 }}>
-              {calculateTotal(data?.codeData, 'performance')}
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              총 실적 건수
-            </Typography>
-          </Box>
-        )}
-        {codeTableOpen && (
-          <ClosingChartTable
-            data={data.codeData}
-            type="code"
-            rankingType={rankingType}
-            total={calculateTotal(data?.codeData, 'performance')}
-            headerColor="#4CAF50"
-          />
-        )}
-      </Paper>
-      )}
-
-      {/* 사무실별 실적 테이블 - 세부 옵션이 'office'이거나 선택되지 않았거나 presentationMode일 때만 표시 */}
-      {(!propCsDetailType || propCsDetailType === 'office' || propCsDetailType === 'all' || presentationMode) && (
-      <Paper sx={{ 
-        mb: 2, 
-        borderRadius: 2,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        overflow: 'hidden'
-      }}>
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between', 
-          p: 2, 
-          background: 'linear-gradient(135deg, #E91E63 0%, #C2185B 100%)',
-          color: 'white'
-        }}>
-          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-            🏢 사무실별 실적
-          </Typography>
-          <Button
-            size="small"
-            onClick={() => setOfficeTableOpen(!officeTableOpen)}
-            startIcon={officeTableOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            sx={{ 
-              color: 'white', 
-              borderColor: 'white',
-              '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
-            }}
-            variant="outlined"
-          >
-            {officeTableOpen ? '접기' : '펼치기'}
-          </Button>
-        </Box>
-        {!officeTableOpen && (
-          <Box sx={{ 
-            p: 3, 
-            textAlign: 'center',
-            background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)'
-          }}>
-            <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#E91E63', mb: 1 }}>
-              {calculateTotal(data?.officeData, 'performance')}
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              총 실적 건수
-            </Typography>
-          </Box>
-        )}
-        {officeTableOpen && (
-          <ClosingChartTable
-            data={data.officeData}
-            type="office"
-            rankingType={rankingType}
-            total={calculateTotal(data?.officeData, 'performance')}
-            headerColor="#E91E63"
-          />
-        )}
-      </Paper>
-      )}
-
-      {/* 소속별 실적 테이블 - 세부 옵션이 'department'이거나 선택되지 않았거나 presentationMode일 때만 표시 */}
-      {(!propCsDetailType || propCsDetailType === 'department' || propCsDetailType === 'all' || presentationMode) && (
-      <Paper sx={{ 
-        mb: 2, 
-        borderRadius: 2,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        overflow: 'hidden'
-      }}>
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between', 
-          p: 2, 
-          background: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)',
-          color: 'white'
-        }}>
-          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-            👥 소속별 실적
-          </Typography>
-          <Button
-            size="small"
-            onClick={() => setDepartmentTableOpen(!departmentTableOpen)}
-            startIcon={departmentTableOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            sx={{ 
-              color: 'white', 
-              borderColor: 'white',
-              '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
-            }}
-            variant="outlined"
-          >
-            {departmentTableOpen ? '접기' : '펼치기'}
-          </Button>
-        </Box>
-        {!departmentTableOpen && (
-          <Box sx={{ 
-            p: 3, 
-            textAlign: 'center',
-            background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)'
-          }}>
-            <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#2196F3', mb: 1 }}>
-              {calculateTotal(data?.departmentData, 'performance')}
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              총 실적 건수
-            </Typography>
-          </Box>
-        )}
-        {departmentTableOpen && (
-          <ClosingChartTable
-            data={data.departmentData}
-            type="department"
-            rankingType={rankingType}
-            total={calculateTotal(data?.departmentData, 'performance')}
-            headerColor="#2196F3"
-          />
-        )}
-      </Paper>
-      )}
-
-      {/* 담당자별 실적 테이블 - 세부 옵션이 'agent'이거나 선택되지 않았거나 presentationMode일 때만 표시 */}
-      {(!propCsDetailType || propCsDetailType === 'agent' || propCsDetailType === 'all' || presentationMode) && (
-      <Paper 
-        data-agent-section="true"
-        sx={{ 
-          mb: 2, 
+        <Paper sx={{
+          mb: 2,
           borderRadius: 2,
           boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
           overflow: 'hidden'
         }}>
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between', 
-          p: 2, 
-          background: 'linear-gradient(135deg, #FF9800 0%, #F57C00 100%)',
-          color: 'white'
-        }}>
-          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-            👤 담당자별 실적
-          </Typography>
-          <Button
-            size="small"
-            onClick={() => setAgentTableOpen(!agentTableOpen)}
-            startIcon={agentTableOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            sx={{ 
-              color: 'white', 
-              borderColor: 'white',
-              '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
-            }}
-            variant="outlined"
-          >
-            {agentTableOpen ? '접기' : '펼치기'}
-          </Button>
-        </Box>
-        {!agentTableOpen && (
-          <Box sx={{ 
-            p: 3, 
-            textAlign: 'center',
-            background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)'
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            p: 2,
+            background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
+            color: 'white'
           }}>
-            <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#FF9800', mb: 1 }}>
-              {calculateTotal(data?.agentData, 'performance')}
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              📊 코드별 실적
             </Typography>
-            <Typography variant="body1" color="text.secondary">
-              총 실적 건수
-            </Typography>
+            <Button
+              size="small"
+              onClick={() => setCodeTableOpen(!codeTableOpen)}
+              startIcon={codeTableOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              sx={{
+                color: 'white',
+                borderColor: 'white',
+                '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
+              }}
+              variant="outlined"
+            >
+              {codeTableOpen ? '접기' : '펼치기'}
+            </Button>
           </Box>
-        )}
-        {agentTableOpen && (
-          <ClosingChartTable
-            data={data.agentData}
-            type="agent"
-            rankingType={rankingType}
-            total={calculateTotal(data?.agentData, 'performance')}
-            headerColor="#FF9800"
-          />
-        )}
-      </Paper>
+          {!codeTableOpen && (
+            <Box sx={{
+              p: 3,
+              textAlign: 'center',
+              background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)'
+            }}>
+              <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#4CAF50', mb: 1 }}>
+                {calculateTotal(data?.codeData, 'performance')}
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                총 실적 건수
+              </Typography>
+            </Box>
+          )}
+          {codeTableOpen && (
+            <ClosingChartTable
+              data={data.codeData}
+              type="code"
+              rankingType={rankingType}
+              total={calculateTotal(data?.codeData, 'performance')}
+              headerColor="#4CAF50"
+            />
+          )}
+        </Paper>
+      )}
+
+      {/* 사무실별 실적 테이블 - 세부 옵션이 'office'이거나 선택되지 않았거나 presentationMode일 때만 표시 */}
+      {(!propCsDetailType || propCsDetailType === 'office' || propCsDetailType === 'all' || presentationMode) && (
+        <Paper sx={{
+          mb: 2,
+          borderRadius: 2,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          overflow: 'hidden'
+        }}>
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            p: 2,
+            background: 'linear-gradient(135deg, #E91E63 0%, #C2185B 100%)',
+            color: 'white'
+          }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              🏢 사무실별 실적
+            </Typography>
+            <Button
+              size="small"
+              onClick={() => setOfficeTableOpen(!officeTableOpen)}
+              startIcon={officeTableOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              sx={{
+                color: 'white',
+                borderColor: 'white',
+                '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
+              }}
+              variant="outlined"
+            >
+              {officeTableOpen ? '접기' : '펼치기'}
+            </Button>
+          </Box>
+          {!officeTableOpen && (
+            <Box sx={{
+              p: 3,
+              textAlign: 'center',
+              background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)'
+            }}>
+              <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#E91E63', mb: 1 }}>
+                {calculateTotal(data?.officeData, 'performance')}
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                총 실적 건수
+              </Typography>
+            </Box>
+          )}
+          {officeTableOpen && (
+            <ClosingChartTable
+              data={data.officeData}
+              type="office"
+              rankingType={rankingType}
+              total={calculateTotal(data?.officeData, 'performance')}
+              headerColor="#E91E63"
+            />
+          )}
+        </Paper>
+      )}
+
+      {/* 소속별 실적 테이블 - 세부 옵션이 'department'이거나 선택되지 않았거나 presentationMode일 때만 표시 */}
+      {(!propCsDetailType || propCsDetailType === 'department' || propCsDetailType === 'all' || presentationMode) && (
+        <Paper sx={{
+          mb: 2,
+          borderRadius: 2,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          overflow: 'hidden'
+        }}>
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            p: 2,
+            background: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)',
+            color: 'white'
+          }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              👥 소속별 실적
+            </Typography>
+            <Button
+              size="small"
+              onClick={() => setDepartmentTableOpen(!departmentTableOpen)}
+              startIcon={departmentTableOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              sx={{
+                color: 'white',
+                borderColor: 'white',
+                '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
+              }}
+              variant="outlined"
+            >
+              {departmentTableOpen ? '접기' : '펼치기'}
+            </Button>
+          </Box>
+          {!departmentTableOpen && (
+            <Box sx={{
+              p: 3,
+              textAlign: 'center',
+              background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)'
+            }}>
+              <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#2196F3', mb: 1 }}>
+                {calculateTotal(data?.departmentData, 'performance')}
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                총 실적 건수
+              </Typography>
+            </Box>
+          )}
+          {departmentTableOpen && (
+            <ClosingChartTable
+              data={data.departmentData}
+              type="department"
+              rankingType={rankingType}
+              total={calculateTotal(data?.departmentData, 'performance')}
+              headerColor="#2196F3"
+            />
+          )}
+        </Paper>
+      )}
+
+      {/* 담당자별 실적 테이블 - 세부 옵션이 'agent'이거나 선택되지 않았거나 presentationMode일 때만 표시 */}
+      {(!propCsDetailType || propCsDetailType === 'agent' || propCsDetailType === 'all' || presentationMode) && (
+        <Paper
+          data-agent-section="true"
+          sx={{
+            mb: 2,
+            borderRadius: 2,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            overflow: 'hidden'
+          }}>
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            p: 2,
+            background: 'linear-gradient(135deg, #FF9800 0%, #F57C00 100%)',
+            color: 'white'
+          }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              👤 담당자별 실적
+            </Typography>
+            <Button
+              size="small"
+              onClick={() => setAgentTableOpen(!agentTableOpen)}
+              startIcon={agentTableOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              sx={{
+                color: 'white',
+                borderColor: 'white',
+                '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
+              }}
+              variant="outlined"
+            >
+              {agentTableOpen ? '접기' : '펼치기'}
+            </Button>
+          </Box>
+          {!agentTableOpen && (
+            <Box sx={{
+              p: 3,
+              textAlign: 'center',
+              background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)'
+            }}>
+              <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#FF9800', mb: 1 }}>
+                {calculateTotal(data?.agentData, 'performance')}
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                총 실적 건수
+              </Typography>
+            </Box>
+          )}
+          {agentTableOpen && (
+            <ClosingChartTable
+              data={data.agentData}
+              type="agent"
+              rankingType={rankingType}
+              total={calculateTotal(data?.agentData, 'performance')}
+              headerColor="#FF9800"
+            />
+          )}
+        </Paper>
       )}
 
       {/* 목표 설정 모달 */}
@@ -2776,7 +2776,7 @@ function AgentClosingTab() {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [dataRendered, setDataRendered] = useState(false); // 실제 데이터 렌더링 완료 여부
   const containerRef = useRef(null);
-  
+
   // 업체 재고 상세 모달 상태 (2단계 구조)
   const [showTypeSelectionModal, setShowTypeSelectionModal] = useState(false);
   const [showInventoryDetailModal, setShowInventoryDetailModal] = useState(false);
@@ -2813,12 +2813,12 @@ function AgentClosingTab() {
             return;
           }
         }
-        
+
         // API 실패 시 오늘 날짜로 설정
         const today = new Date().toISOString().split('T')[0];
         setSelectedDate(today);
         await loadData(today, '');
-        
+
       } catch (error) {
         console.error('초기 데이터 로드 실패:', error);
         // 오류 시 오늘 날짜로 설정
@@ -2827,7 +2827,7 @@ function AgentClosingTab() {
         await loadData(today, '');
       }
     };
-    
+
     initializeData();
   }, []); // 컴포넌트 마운트 시 한 번만 실행
 
@@ -2842,7 +2842,7 @@ function AgentClosingTab() {
       if (agent) {
         params.append('agent', agent);
       }
-      
+
       const response = await fetchWithRetry(
         `${process.env.REACT_APP_API_URL}/api/agent-closing-chart?${params}`,
         {
@@ -2892,7 +2892,7 @@ function AgentClosingTab() {
       if (agentsResponse.ok) {
         const agentsResult = await agentsResponse.json();
         setAvailableAgents(agentsResult.agents || []);
-        
+
         // 이번달 개통실적 정보 로그 출력
         if (agentsResult.agentsWithActivation !== undefined) {
           console.log(`📊 이번달 개통실적 있는 담당자: ${agentsResult.agentsWithActivation}명 (전체 ${agentsResult.totalAgents}명 중)`);
@@ -2939,7 +2939,7 @@ function AgentClosingTab() {
     setInventoryLoading(true);
     setShowTypeSelectionModal(true);
     setSelectedInventoryType('');
-    
+
     // 업체별 재고 데이터 로드
     fetch(`${process.env.REACT_APP_API_URL}/api/company-inventory-details?companyName=${encodeURIComponent(companyName)}`)
       .then(response => response.json())
@@ -2982,29 +2982,29 @@ function AgentClosingTab() {
       setDataRendered(false);
       return;
     }
-    
+
     if (!containerRef.current) {
       return;
     }
-    
+
     // 데이터가 있는지 확인
     const hasData = data.agentData && Array.isArray(data.agentData) && data.agentData.length > 0;
-    
+
     if (!hasData) {
       setDataRendered(false);
       return;
     }
-    
+
     // 짧은 지연 후 데이터 렌더링 완료로 설정
     const timer = setTimeout(() => {
       const tableRows = containerRef.current.querySelectorAll('table tbody tr, .MuiTableBody-root tr, tbody tr');
       const hasTableRows = tableRows.length > 0;
-      
+
       if (hasTableRows) {
         setDataRendered(true);
       }
     }, 100);
-    
+
     return () => clearTimeout(timer);
   }, [data, loading]);
 
@@ -3094,10 +3094,10 @@ function AgentClosingTab() {
   const groupedAgents = groupAgentNames(availableAgents);
 
   return (
-    <Box 
+    <Box
       ref={containerRef}
-      sx={{ p: 2 }} 
-      data-loaded={dataRendered && data && !loading ? 'true' : 'false'} 
+      sx={{ p: 2 }}
+      data-loaded={dataRendered && data && !loading ? 'true' : 'false'}
       data-loading={loading ? 'true' : 'false'}
     >
       {/* 상단 필터 */}
@@ -3107,7 +3107,7 @@ function AgentClosingTab() {
             <Typography variant="h6">
               {new Date(selectedDate).getDate()}일 담당자별마감 실적장표
             </Typography>
-            
+
             {/* 마감기준날짜 필터 */}
             <TextField
               type="date"
@@ -3117,7 +3117,7 @@ function AgentClosingTab() {
               size="small"
               sx={{ minWidth: 150 }}
             />
-            
+
             {/* 담당자 필터 (검색 가능) */}
             <Autocomplete
               size="small"
@@ -3142,11 +3142,11 @@ function AgentClosingTab() {
               )}
               noOptionsText="검색 결과가 없습니다"
             />
-            
+
             <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
               * 이번달 개통실적이 있는 담당자만 표시됩니다
             </Typography>
-            
+
             <Button
               variant="outlined"
               onClick={handleRefresh}
@@ -3155,7 +3155,7 @@ function AgentClosingTab() {
               새로고침
             </Button>
           </Box>
-          
+
           {lastUpdate && (
             <Typography variant="caption" color="text.secondary">
               마지막 업데이트: {lastUpdate.toLocaleTimeString()}
@@ -3166,16 +3166,16 @@ function AgentClosingTab() {
 
       {/* 영업사원별 실적 테이블 */}
       {data && (
-        <Paper sx={{ 
+        <Paper sx={{
           borderRadius: 2,
           boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
           overflow: 'hidden'
         }}>
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between', 
-            p: 2, 
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            p: 2,
             background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
             color: 'white'
           }}>
@@ -3183,9 +3183,9 @@ function AgentClosingTab() {
               👤 담당자별 마감 실적
             </Typography>
           </Box>
-          
-          <TableContainer sx={{ 
-            borderRadius: 1, 
+
+          <TableContainer sx={{
+            borderRadius: 1,
             overflow: 'auto',
             maxWidth: '100%',
             maxHeight: '70vh',
@@ -3198,7 +3198,7 @@ function AgentClosingTab() {
               <TableHead>
                 {/* 상단 합계 행 (헤더 위쪽) */}
                 {data && data.agentData && data.agentData.length > 0 && (
-                  <TableRow sx={{ 
+                  <TableRow sx={{
                     fontWeight: 'bold',
                     position: 'sticky',
                     top: 0,
@@ -3249,27 +3249,27 @@ function AgentClosingTab() {
                           <TableCell sx={{ width: { xs: '70px', sm: '90px' }, textAlign: 'center' }}>
                             {totals.remainingSims}
                           </TableCell>
-                          <TableCell sx={{ 
+                          <TableCell sx={{
                             width: { xs: '70px', sm: '90px' },
-                            textAlign: 'center', 
+                            textAlign: 'center',
                             fontWeight: 'bold',
                             bgcolor: '#ffffff',
                             color: totals.dailyPerformance > 2 ? '#d32f2f' : totals.dailyPerformance > 1 ? '#1976d2' : totals.dailyPerformance > 0 ? '#2e7d32' : '#757575'
                           }}>
                             {totals.dailyPerformance}
                           </TableCell>
-                          <TableCell sx={{ 
+                          <TableCell sx={{
                             width: { xs: '70px', sm: '90px' },
-                            textAlign: 'center', 
+                            textAlign: 'center',
                             fontWeight: 'bold',
                             bgcolor: '#ffffff',
                             color: totals.monthlyPerformance >= 40 ? '#f9a825' : totals.monthlyPerformance >= 30 ? '#7b1fa2' : totals.monthlyPerformance >= 20 ? '#d32f2f' : totals.monthlyPerformance >= 10 ? '#1976d2' : totals.monthlyPerformance > 1 ? '#2e7d32' : '#757575'
                           }}>
                             {totals.monthlyPerformance}
                           </TableCell>
-                          <TableCell sx={{ 
+                          <TableCell sx={{
                             width: { xs: '70px', sm: '90px' },
-                            textAlign: 'center', 
+                            textAlign: 'center',
                             fontWeight: 'bold',
                             bgcolor: '#ffffff',
                             color: totals.expectedClosing >= 40 ? '#f9a825' : totals.expectedClosing >= 30 ? '#7b1fa2' : totals.expectedClosing >= 20 ? '#d32f2f' : totals.expectedClosing >= 10 ? '#1976d2' : totals.expectedClosing > 1 ? '#2e7d32' : '#757575'
@@ -3284,7 +3284,7 @@ function AgentClosingTab() {
                     })()}
                   </TableRow>
                 )}
-                <TableRow sx={{ 
+                <TableRow sx={{
                   backgroundColor: '#1976d2',
                   position: 'sticky',
                   top: data && data.agentData && data.agentData.length > 0 ? '48px' : 0,
@@ -3322,17 +3322,17 @@ function AgentClosingTab() {
                   data.agentData.map((row, index) => {
                     // 담당자명에서 괄호 제거하여 그룹핑 키 생성
                     const agentBaseName = (row.agent || '').replace(/\([^)]*\)/g, '').trim();
-                    
+
                     // 담당자별 배경색 결정 (동적 색상 생성)
                     const getGroupBackgroundColor = (agentName) => {
                       if (!agentName) return '#fafafa';
-                      
+
                       // 문자열을 해시값으로 변환하여 일관된 색상 생성
                       let hash = 0;
                       for (let i = 0; i < agentName.length; i++) {
                         hash = agentName.charCodeAt(i) + ((hash << 5) - hash);
                       }
-                      
+
                       // 미리 정의된 색상 팔레트
                       const colorPalette = [
                         '#f3e5f5', // 보라색 계열
@@ -3352,7 +3352,7 @@ function AgentClosingTab() {
                         '#e3f2fd', // 파란색 계열
                         '#f1f8e9'  // 연두색 계열
                       ];
-                      
+
                       // 해시값을 색상 팔레트 인덱스로 변환
                       const colorIndex = Math.abs(hash) % colorPalette.length;
                       return colorPalette[colorIndex];
@@ -3381,77 +3381,77 @@ function AgentClosingTab() {
                     const expectedColor = getMonthlyColor(row.expectedClosing || 0);
 
                     return (
-                      <TableRow key={index} sx={{ 
+                      <TableRow key={index} sx={{
                         backgroundColor: getGroupBackgroundColor(row.agent || ''),
                         cursor: 'pointer',
                         '&:hover': { backgroundColor: '#e3f2fd' }
                       }} onClick={() => handleCompanyClick(row.companyName)}>
-                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
-                        {row.policyGroup || '-'}
-                      </TableCell>
-                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
-                        {row.pCode || '-'}
-                      </TableCell>
-                      <TableCell sx={{ 
-                        fontSize: { xs: '0.6rem', sm: '0.7rem' },
-                        textAlign: 'center'
-                      }}>
-                        {row.companyName || '-'}
-                      </TableCell>
-                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
-                        {row.agent || '-'}
-                      </TableCell>
-                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
-                        {row.turnoverRate ? `${row.turnoverRate}%` : '-'}
-                      </TableCell>
-                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
-                        {row.defectiveDevices || 0}
-                      </TableCell>
-                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
-                        {row.historyDevices || 0}
-                      </TableCell>
-                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
-                        {row.defectiveSims || 0}
-                      </TableCell>
-                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
-                        {row.historySims || 0}
-                      </TableCell>
-                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
-                        {row.totalInventory || 0}
-                      </TableCell>
-                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
-                        {row.remainingSims || 0}
-                      </TableCell>
-                      <TableCell sx={{ 
-                        fontSize: { xs: '0.6rem', sm: '0.7rem' }, 
-                        textAlign: 'center', 
-                        fontWeight: 'bold',
-                        bgcolor: '#ffffff',
-                        color: dailyColor.color
-                      }}>
-                        {row.dailyPerformance || 0}
-                      </TableCell>
-                      <TableCell sx={{ 
-                        fontSize: { xs: '0.6rem', sm: '0.7rem' }, 
-                        textAlign: 'center', 
-                        fontWeight: 'bold',
-                        bgcolor: '#ffffff',
-                        color: monthlyColor.color
-                      }}>
-                        {row.monthlyPerformance || 0}
-                      </TableCell>
-                      <TableCell sx={{ 
-                        fontSize: { xs: '0.6rem', sm: '0.7rem' }, 
-                        textAlign: 'center', 
-                        fontWeight: 'bold',
-                        bgcolor: '#ffffff',
-                        color: expectedColor.color
-                      }}>
-                        {row.expectedClosing || 0}
-                      </TableCell>
-                      <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center', fontWeight: 'bold', color: '#d32f2f' }}>
-                        {row.noPerformanceStores || ''}
-                      </TableCell>
+                        <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                          {row.policyGroup || '-'}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                          {row.pCode || '-'}
+                        </TableCell>
+                        <TableCell sx={{
+                          fontSize: { xs: '0.6rem', sm: '0.7rem' },
+                          textAlign: 'center'
+                        }}>
+                          {row.companyName || '-'}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                          {row.agent || '-'}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                          {row.turnoverRate ? `${row.turnoverRate}%` : '-'}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                          {row.defectiveDevices || 0}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                          {row.historyDevices || 0}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                          {row.defectiveSims || 0}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                          {row.historySims || 0}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                          {row.totalInventory || 0}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center' }}>
+                          {row.remainingSims || 0}
+                        </TableCell>
+                        <TableCell sx={{
+                          fontSize: { xs: '0.6rem', sm: '0.7rem' },
+                          textAlign: 'center',
+                          fontWeight: 'bold',
+                          bgcolor: '#ffffff',
+                          color: dailyColor.color
+                        }}>
+                          {row.dailyPerformance || 0}
+                        </TableCell>
+                        <TableCell sx={{
+                          fontSize: { xs: '0.6rem', sm: '0.7rem' },
+                          textAlign: 'center',
+                          fontWeight: 'bold',
+                          bgcolor: '#ffffff',
+                          color: monthlyColor.color
+                        }}>
+                          {row.monthlyPerformance || 0}
+                        </TableCell>
+                        <TableCell sx={{
+                          fontSize: { xs: '0.6rem', sm: '0.7rem' },
+                          textAlign: 'center',
+                          fontWeight: 'bold',
+                          bgcolor: '#ffffff',
+                          color: expectedColor.color
+                        }}>
+                          {row.expectedClosing || 0}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' }, textAlign: 'center', fontWeight: 'bold', color: '#d32f2f' }}>
+                          {row.noPerformanceStores || ''}
+                        </TableCell>
                       </TableRow>
                     );
                   })
@@ -3518,9 +3518,9 @@ function InventoryTypeSelectionModal({ open, onClose, data, loading, companyName
       maxWidth="md"
       fullWidth
     >
-      <DialogTitle sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
+      <DialogTitle sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
         alignItems: 'center',
         background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
         color: 'white'
@@ -3532,7 +3532,7 @@ function InventoryTypeSelectionModal({ open, onClose, data, loading, companyName
           <CloseIcon />
         </IconButton>
       </DialogTitle>
-      
+
       <DialogContent sx={{ p: 3 }}>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
@@ -3549,8 +3549,8 @@ function InventoryTypeSelectionModal({ open, onClose, data, loading, companyName
                   key={type.key}
                   variant="contained"
                   onClick={() => onTypeSelect(type.key)}
-                  sx={{ 
-                    minWidth: '180px', 
+                  sx={{
+                    minWidth: '180px',
                     minHeight: '60px',
                     fontSize: '1rem',
                     fontWeight: 'bold'
@@ -3564,7 +3564,7 @@ function InventoryTypeSelectionModal({ open, onClose, data, loading, companyName
           </Box>
         )}
       </DialogContent>
-      
+
       <DialogActions sx={{ p: 2 }}>
         <Button onClick={onClose}>닫기</Button>
       </DialogActions>
@@ -3578,7 +3578,7 @@ function InventoryDetailModal({ open, onClose, data, selectedType, companyName }
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
     const printData = data && selectedType ? data[selectedType] : [];
-    
+
     let printHTML = `
       <!DOCTYPE html>
       <html>
@@ -3613,7 +3613,7 @@ function InventoryDetailModal({ open, onClose, data, selectedType, companyName }
           </thead>
           <tbody>
     `;
-    
+
     printData.forEach(item => {
       printHTML += `
         <tr>
@@ -3627,14 +3627,14 @@ function InventoryDetailModal({ open, onClose, data, selectedType, companyName }
         </tr>
       `;
     });
-    
+
     printHTML += `
           </tbody>
         </table>
       </body>
       </html>
     `;
-    
+
     printWindow.document.write(printHTML);
     printWindow.document.close();
     printWindow.print();
@@ -3661,9 +3661,9 @@ function InventoryDetailModal({ open, onClose, data, selectedType, companyName }
         sx: { minHeight: '600px' }
       }}
     >
-      <DialogTitle sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
+      <DialogTitle sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
         alignItems: 'center',
         background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
         color: 'white'
@@ -3675,7 +3675,7 @@ function InventoryDetailModal({ open, onClose, data, selectedType, companyName }
           <CloseIcon />
         </IconButton>
       </DialogTitle>
-      
+
       <DialogContent sx={{ p: 3 }}>
         {selectedType && data && data[selectedType] && (
           <Box>
@@ -3691,7 +3691,7 @@ function InventoryDetailModal({ open, onClose, data, selectedType, companyName }
                 인쇄
               </Button>
             </Box>
-            
+
             <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
@@ -3751,8 +3751,8 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
   const totalExpectedClosing = calculateTotal(data, 'expectedClosing');
 
   return (
-    <TableContainer sx={{ 
-      borderRadius: 1, 
+    <TableContainer sx={{
+      borderRadius: 1,
       overflow: 'auto',
       maxWidth: '100%',
       '& .MuiTable-root': {
@@ -3763,7 +3763,7 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
       <Table size="small">
         <TableBody>
           {/* 상단 합계 행 (헤더 위쪽) */}
-          <TableRow sx={{ 
+          <TableRow sx={{
             background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
             fontWeight: 'bold',
             '& .MuiTableCell-root': {
@@ -3797,10 +3797,10 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
           </TableRow>
         </TableBody>
       </Table>
-      
+
       <Table size="small">
         <TableHead>
-          <TableRow sx={{ 
+          <TableRow sx={{
             backgroundColor: headerColor,
             '& .MuiTableCell-root': {
               color: 'white',
@@ -3831,12 +3831,12 @@ function ClosingChartTable({ data, type, rankingType, total, headerColor = 'ligh
           </TableRow>
         </TableHead>
         <TableBody>
-          
+
           {/* 데이터 행들 */}
           {sortedData.map((item, index) => (
-            <TableRow 
+            <TableRow
               key={index}
-              sx={{ 
+              sx={{
                 '&:hover': {
                   backgroundColor: 'rgba(0,0,0,0.04)',
                   transition: 'background-color 0.2s'
@@ -3899,11 +3899,11 @@ function TargetSettingModal({ open, onClose, onSave, agents, excludedAgents }) {
     try {
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/closing-chart/agent-code-combinations`);
       const data = await response.json();
-      
+
       if (data.combinations) {
         setCombinations(data.combinations);
         setTargets(data.combinations);
-        
+
         console.log('🔍 [목표설정] 담당자-코드 조합 로드:', {
           총조합수: data.combinations.length,
           샘플: data.combinations.slice(0, 5)
@@ -3966,10 +3966,10 @@ function TargetSettingModal({ open, onClose, onSave, agents, excludedAgents }) {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         {target.agent}
                         {target.excluded && (
-                          <Chip 
-                            label="제외" 
-                            size="small" 
-                            color="default" 
+                          <Chip
+                            label="제외"
+                            size="small"
+                            color="default"
                             sx={{ fontSize: '0.7rem' }}
                           />
                         )}
@@ -4001,9 +4001,9 @@ function TargetSettingModal({ open, onClose, onSave, agents, excludedAgents }) {
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>취소</Button>
-        <Button 
-          onClick={handleSave} 
-          variant="contained" 
+        <Button
+          onClick={handleSave}
+          variant="contained"
           disabled={loading}
         >
           {loading ? '저장 중...' : '저장'}
@@ -4056,10 +4056,10 @@ function MappingFailureModal({ open, onClose, failures }) {
 // 채권장표 준비 중 탭 컴포넌트
 function BondChartComingSoonTab() {
   return (
-    <Paper 
-      elevation={3} 
-      sx={{ 
-        p: 4, 
+    <Paper
+      elevation={3}
+      sx={{
+        p: 4,
         textAlign: 'center',
         background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
         color: 'white',
@@ -4084,10 +4084,10 @@ function BondChartComingSoonTab() {
 // 연체채권 탭 컴포넌트
 function OverdueBondTab() {
   return (
-    <Paper 
-      elevation={3} 
-      sx={{ 
-        p: 4, 
+    <Paper
+      elevation={3}
+      sx={{
+        p: 4,
         textAlign: 'center',
         background: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%)',
         color: '#333',
@@ -4112,24 +4112,24 @@ function OverdueBondTab() {
 // 숫자를 한글 단위로 변환하는 함수 (상세 형식)
 const formatKoreanCurrency = (num) => {
   if (num === 0) return '0원';
-  
+
   const isNegative = num < 0;
   const absNum = Math.abs(num);
-  
+
   const units = ['', '십', '백', '천'];
   const tenThousandUnits = ['', '만', '억', '조'];
-  
+
   let result = '';
   let unitIndex = 0;
   let tempNum = absNum;
-  
+
   while (tempNum > 0) {
     const part = tempNum % 10000;
     if (part > 0) {
       let partStr = '';
       let partTemp = part;
       let pos = 0;
-      
+
       while (partTemp > 0) {
         const digit = partTemp % 10;
         if (digit > 0) {
@@ -4143,13 +4143,13 @@ const formatKoreanCurrency = (num) => {
         partTemp = Math.floor(partTemp / 10);
         pos++;
       }
-      
+
       result = partStr + tenThousandUnits[unitIndex] + result;
     }
     tempNum = Math.floor(tempNum / 10000);
     unitIndex++;
   }
-  
+
   return (isNegative ? '-' : '') + result + '원';
 };
 
@@ -4158,7 +4158,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
-  
+
   // 5개 대리점 정보
   const agents = [
     { code: '306891', name: '경수' },
@@ -4167,7 +4167,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
     { code: '314942', name: '호남' },
     { code: '316254', name: '호남2' }
   ];
-  
+
   // 입력 데이터 상태
   const [inputData, setInputData] = useState(
     agents.map(agent => ({
@@ -4178,20 +4178,20 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
       managementBond: 0
     }))
   );
-  
+
   // 저장 시점 목록
   const [history, setHistory] = useState([]);
   const [selectedTimestamp, setSelectedTimestamp] = useState('');
-  
+
   // 월별 필터링을 위한 상태 (기본값: 현재 월)
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
-  
+
   // 전체 데이터 (그래프용)
   const [allData, setAllData] = useState([]);
-  
+
   // 현재 데이터 (선택된 시점 또는 입력 중인 데이터)
   const [currentData, setCurrentData] = useState([]);
   const containerRef = useRef(null);
@@ -4199,7 +4199,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
   // data-loaded, data-loading 속성 관리
   useEffect(() => {
     if (!containerRef.current) return;
-    
+
     if (loading) {
       containerRef.current.setAttribute('data-loading', 'true');
       containerRef.current.removeAttribute('data-loaded');
@@ -4241,7 +4241,14 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
     try {
       const result = await fetchWithRetry(`${API_BASE_URL}/api/rechotancho-bond/history`);
       if (result.success) {
-        const historyData = result.data || [];
+        let historyData = result.data || [];
+        // 드롭다운 호환성을 위해 데이터 형식 변환 (배열 [timestamp, user] -> 객체 {timestamp, inputUser})
+        if (Array.isArray(historyData) && historyData.length > 0 && Array.isArray(historyData[0])) {
+          historyData = historyData.map(row => ({
+            timestamp: row[0],
+            inputUser: row[1] || '시스템'
+          }));
+        }
         setHistory(historyData);
         if (presentationMode && historyData.length > 0) {
           const sortedHistory = [...historyData].sort((a, b) => (new Date(b.timestamp) - new Date(a.timestamp)));
@@ -4298,19 +4305,19 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
       // setLoading(true);
       const response = await fetch(`${API_BASE_URL}/api/rechotancho-bond/all-data`);
       const result = await response.json();
-      
+
       if (result.success) {
         const data = result.data || [];
         setAllData(data);
         setCurrentData(data);
-        
+
         // 현재 선택된 월에 데이터가 없으면 가장 최근 데이터가 있는 월로 변경
         if (data.length > 0) {
           const availableMonths = [...new Set(data.map(item => {
             if (!item.timestamp) return null;
             return item.timestamp.substring(0, 7);
           }).filter(Boolean))].sort().reverse();
-          
+
           // 현재 선택된 월에 데이터가 없으면 가장 최근 월로 변경
           if (!availableMonths.includes(selectedMonth) && availableMonths.length > 0) {
             setSelectedMonth(availableMonths[0]);
@@ -4331,7 +4338,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
       // setLoading(true);
       const response = await fetch(`${API_BASE_URL}/api/rechotancho-bond/data/${encodeURIComponent(timestamp)}`);
       const result = await response.json();
-      
+
       if (result.success && result.data.length > 0) {
         // 입력 필드에 데이터 반영
         const loadedData = agents.map(agent => {
@@ -4357,7 +4364,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
   const handleTimestampChange = (event) => {
     const timestamp = event.target.value;
     setSelectedTimestamp(timestamp);
-    
+
     if (timestamp) {
       loadDataByTimestamp(timestamp);
     } else {
@@ -4378,17 +4385,17 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
   const handleInputChange = (index, field, value) => {
     // 콤마 제거하고 숫자만 추출
     const numericValue = value.replace(/,/g, '');
-    
+
     const newData = [...inputData];
     newData[index][field] = numericValue;
-    
+
     // 관리대상채권 자동 계산
     if (field === 'inventoryBond' || field === 'collateralBond') {
       const inventory = Number(newData[index].inventoryBond) || 0;
       const collateral = Number(newData[index].collateralBond) || 0;
       newData[index].managementBond = inventory - collateral;
     }
-    
+
     setInputData(newData);
   };
 
@@ -4402,7 +4409,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
   const handleSave = async () => {
     try {
       setSaving(true);
-      
+
       // 빈 필드는 0으로 처리하여 저장
       const dataToSave = inputData.map(item => ({
         ...item,
@@ -4410,7 +4417,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
         collateralBond: item.collateralBond === '' ? 0 : Number(item.collateralBond),
         managementBond: (Number(item.inventoryBond) || 0) - (Number(item.collateralBond) || 0)
       }));
-      
+
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/rechotancho-bond/save`, {
         method: 'POST',
         headers: {
@@ -4421,9 +4428,9 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
           inputUser: loggedInStore?.name || loggedInStore?.target || '사용자'
         })
       });
-      
+
       const result = await response.json();
-      
+
       if (result.success) {
         alert('데이터가 성공적으로 저장되었습니다.');
         // 데이터 새로고침
@@ -4463,7 +4470,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
 
     try {
       setSaving(true);
-      
+
       // 빈 필드는 0으로 처리하여 저장
       const dataToSave = inputData.map(item => ({
         agentCode: item.agentCode,
@@ -4485,7 +4492,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         alert('데이터가 성공적으로 수정되었습니다.');
         // 데이터 새로고침
@@ -4526,13 +4533,13 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
 
     try {
       setSaving(true);
-      
+
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/rechotancho-bond/delete/${selectedTimestamp}`, {
         method: 'DELETE',
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         alert('데이터가 성공적으로 삭제되었습니다.');
         // 데이터 새로고침
@@ -4566,12 +4573,12 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
     const dataToShow = inputData.some(d => d.inventoryBond !== '' || d.collateralBond !== '')
       ? inputData
       : allData.length > 0
-      ? agents.map(agent => {
+        ? agents.map(agent => {
           // 최신 데이터 찾기
           const latestData = [...allData]
             .filter(d => d.agentCode === agent.code)
             .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
-          
+
           return latestData || {
             agentCode: agent.code,
             agentName: agent.name,
@@ -4580,7 +4587,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
             managementBond: 0
           };
         })
-      : inputData;
+        : inputData;
 
     return {
       labels: agents.map(a => a.name),
@@ -4613,10 +4620,10 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
   // 월별로 필터링된 데이터 생성
   const getFilteredDataByMonth = (month) => {
     if (allData.length === 0) return [];
-    
+
     return allData.filter(item => {
       if (!item.timestamp) return false;
-      
+
       // timestamp에서 년-월 추출 (예: "2024-01-15 10:30:25" -> "2024-01")
       const itemMonth = item.timestamp.substring(0, 7);
       return itemMonth === month;
@@ -4626,7 +4633,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
   // 시계열 선 그래프 데이터 생성 (월별 필터링 적용)
   const getLineChartData = () => {
     const filteredData = getFilteredDataByMonth(selectedMonth);
-    
+
     if (filteredData.length === 0) {
       return { labels: [], datasets: [] };
     }
@@ -4655,10 +4662,10 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
 
     // 각 대리점별로 3개 선 생성 (재고초과, 담보초과, 관리대상)
     const datasets = [];
-    
+
     agents.forEach((agent, idx) => {
       const color = colors[idx];
-      
+
       // 재고초과채권 (기본적으로 숨김)
       datasets.push({
         label: `${agent.name} - 재고초과채권`,
@@ -4675,7 +4682,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
         pointHoverRadius: 5,
         hidden: true  // 기본적으로 숨김
       });
-      
+
       // 담보초과채권 (기본적으로 숨김)
       datasets.push({
         label: `${agent.name} - 담보초과채권`,
@@ -4693,7 +4700,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
         pointHoverRadius: 4,
         hidden: true  // 기본적으로 숨김
       });
-      
+
       // 관리대상채권 (기본적으로 표시)
       datasets.push({
         label: `${agent.name} - 관리대상채권`,
@@ -4744,14 +4751,14 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
       },
       title: {
         display: true,
-        text: selectedTimestamp 
+        text: selectedTimestamp
           ? `대리점별 채권 현황 (${selectedTimestamp.split(' ')[0]})`
           : '대리점별 현재 채권 현황',
         font: { size: 16, weight: 'bold' }
       },
       tooltip: {
         callbacks: {
-          label: function(context) {
+          label: function (context) {
             const value = context.parsed.y;
             return [
               `${context.dataset.label}: ${formatKoreanCurrency(value)}`,
@@ -4764,15 +4771,15 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
         display: true,
         align: 'center',
         anchor: 'center',
-        formatter: function(value) {
+        formatter: function (value) {
           if (value === 0) return '';
-          
+
           // 음수 처리
           const isNegative = value < 0;
           const absValue = Math.abs(value);
-          
+
           let result = '';
-          
+
           // 억 단위
           if (absValue >= 100000000) {
             const eok = Math.floor(absValue / 100000000);
@@ -4794,7 +4801,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
           else {
             result = absValue.toLocaleString();
           }
-          
+
           return isNegative ? `-${result}` : result;
         },
         font: {
@@ -4809,7 +4816,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
           left: 6,
           right: 6
         },
-        color: function(context) {
+        color: function (context) {
           // 각 데이터셋의 색상을 진하게
           const datasetIndex = context.datasetIndex;
           if (datasetIndex === 0) {
@@ -4827,7 +4834,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
       y: {
         beginAtZero: true,
         ticks: {
-          callback: function(value) {
+          callback: function (value) {
             return value.toLocaleString() + '원';
           }
         }
@@ -4858,12 +4865,12 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
           usePointStyle: true,
           padding: 10
         },
-        onClick: function(e, legendItem, legend) {
+        onClick: function (e, legendItem, legend) {
           // 기본 범례 클릭 동작 (선 표시/숨김)
           const index = legendItem.datasetIndex;
           const ci = legend.chart;
           const meta = ci.getDatasetMeta(index);
-          
+
           meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
           ci.update();
         }
@@ -4875,7 +4882,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
       },
       tooltip: {
         callbacks: {
-          label: function(context) {
+          label: function (context) {
             const value = context.parsed.y;
             return [
               `${context.dataset.label}: ${formatKoreanCurrency(value)}`,
@@ -4889,7 +4896,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
       y: {
         beginAtZero: true,
         ticks: {
-          callback: function(value) {
+          callback: function (value) {
             return value.toLocaleString() + '원';
           }
         }
@@ -4912,7 +4919,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
   // presentationMode일 때 그래프와 테이블의 가로 비율을 통일하기 위한 최대 너비
   // 1920px 고정 너비는 화면 최대화 시 html2canvas 캡처 문제를 일으킬 수 있으므로 상대적 너비 사용
   const maxContentWidth = presentationMode ? '100%' : '100%';
-  
+
   return (
     <Box ref={containerRef} sx={{ p: 3 }}>
       <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1, color: '#1a1a1a' }}>
@@ -4927,10 +4934,10 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
       )}
 
       {/* 상단: 막대 그래프 */}
-      <Paper 
-        elevation={3} 
-        sx={{ 
-          p: 3, 
+      <Paper
+        elevation={3}
+        sx={{
+          p: 3,
           mb: 3,
           ...(presentationMode && {
             maxWidth: maxContentWidth,
@@ -4939,7 +4946,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
           })
         }}
       >
-        <Box sx={{ 
+        <Box sx={{
           height: 400,
           width: '100%',
           ...(presentationMode && {
@@ -4953,10 +4960,10 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
 
       {/* 중단: 선 그래프 */}
       {allData.length > 0 && (
-        <Paper 
-          elevation={3} 
-          sx={{ 
-            p: 3, 
+        <Paper
+          elevation={3}
+          sx={{
+            p: 3,
             mb: 3,
             ...(presentationMode && {
               maxWidth: maxContentWidth,
@@ -4981,7 +4988,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
                     if (!item.timestamp) return null;
                     return item.timestamp.substring(0, 7);
                   }).filter(Boolean))].sort().reverse();
-                  
+
                   return availableMonths.map(month => (
                     <MenuItem key={month} value={month}>
                       {month.replace('-', '년 ')}월
@@ -4991,8 +4998,8 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
               </Select>
             </FormControl>
           </Box>
-          
-          <Box sx={{ 
+
+          <Box sx={{
             height: 500,
             width: '100%',
             ...(presentationMode && {
@@ -5006,9 +5013,9 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
       )}
 
       {/* 하단: 데이터 입력 테이블 */}
-      <Paper 
-        elevation={3} 
-        sx={{ 
+      <Paper
+        elevation={3}
+        sx={{
           p: 3,
           ...(presentationMode && {
             maxWidth: maxContentWidth,
@@ -5021,7 +5028,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
           <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
             데이터 입력
           </Typography>
-          
+
           {/* 저장 시점 선택 */}
           <FormControl sx={{ minWidth: 250 }}>
             <InputLabel>저장 시점 선택</InputLabel>
@@ -5084,8 +5091,8 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
                 </TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>
                   <Box>
-                    <Typography sx={{ 
-                      fontSize: '0.9rem', 
+                    <Typography sx={{
+                      fontSize: '0.9rem',
                       color: inputData.reduce((sum, item) => sum + item.managementBond, 0) >= 0 ? 'success.main' : 'error.main',
                       fontWeight: 'bold'
                     }}>
@@ -5099,7 +5106,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
                   </Box>
                 </TableCell>
               </TableRow>
-              
+
               {/* 헤더 행 */}
               <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                 <TableCell sx={{ fontWeight: 'bold' }}>대리점코드</TableCell>
@@ -5144,8 +5151,8 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
                   </TableCell>
                   <TableCell>
                     <Box>
-                      <Typography 
-                        sx={{ 
+                      <Typography
+                        sx={{
                           fontWeight: 'bold',
                           color: item.managementBond >= 0 ? 'success.main' : 'error.main',
                           fontSize: '0.95rem'
@@ -5153,9 +5160,9 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
                       >
                         {formatKoreanCurrency(item.managementBond)}
                       </Typography>
-                      <Typography 
-                        variant="caption" 
-                        sx={{ 
+                      <Typography
+                        variant="caption"
+                        sx={{
                           color: 'text.secondary',
                           fontSize: '0.75rem'
                         }}
@@ -5180,7 +5187,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
           >
             {saving ? '저장 중...' : '저장'}
           </Button>
-          
+
           {selectedTimestamp && (
             <>
               <Button
@@ -5192,7 +5199,7 @@ function RechotanchoBondTab({ loggedInStore, presentationMode = false }) {
               >
                 {saving ? '수정 중...' : '수정'}
               </Button>
-              
+
               <Button
                 variant="outlined"
                 color="error"
@@ -5241,15 +5248,15 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/access`, {
         credentials: 'include'
       });
-      
+
       console.log('🔍 [가입자증감] 권한 확인 응답 상태:', response.status);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('🔍 [가입자증감] 권한 확인 실패:', response.status, errorText);
         throw new Error(`권한 확인 실패: ${response.status} ${errorText}`);
       }
-      
+
       const result = await response.json();
       console.log('🔍 [가입자증감] 권한 확인 결과:', result);
       setHasPermission(result.hasAccess);
@@ -5270,21 +5277,21 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
         },
         credentials: 'include'
       });
-      
+
       console.log('🔍 [가입자증감] 시트 초기화 응답 상태:', response.status);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('🔍 [가입자증감] 시트 초기화 실패:', response.status, errorText);
         throw new Error(`시트 초기화 실패: ${response.status} ${errorText}`);
       }
-      
+
       const result = await response.json();
       console.log('🔍 [가입자증감] 시트 초기화 결과:', result);
       console.log('🔍 [가입자증감] 시트 초기화 성공 여부:', result.success);
       console.log('🔍 [가입자증감] 시트 초기화 데이터:', result.data);
       console.log('🔍 [가입자증감] 시트 초기화 데이터 길이:', result.data ? result.data.length : 'null');
-      
+
       if (result.success) {
         setData(result.data);
         return result.data;
@@ -5300,7 +5307,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
   const fetchData = async () => {
     try {
       console.log('🔍 [가입자증감] 데이터 조회 API 호출 시작');
-      
+
       // fetchWithRetry를 사용하여 재시도 메커니즘 적용
       const response = await fetchWithRetry(
         `${process.env.REACT_APP_API_URL}/api/subscriber-increase/data`,
@@ -5312,15 +5319,15 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
           timeout: 30000,
         }
       );
-      
+
       console.log('🔍 [가입자증감] 데이터 조회 응답 상태:', response.status);
-      
+
       const result = await response.json();
       console.log('🔍 [가입자증감] 데이터 조회 결과:', result);
       console.log('🔍 [가입자증감] 데이터 조회 성공 여부:', result.success);
       console.log('🔍 [가입자증감] 데이터 조회 데이터:', result.data);
       console.log('🔍 [가입자증감] 데이터 조회 데이터 길이:', result.data ? result.data.length : 'null');
-      
+
       if (result.success) {
         console.log('🔍 [가입자증감] 로드된 데이터 확인:', result.data);
         console.log('🔍 [가입자증감] 315835(제외) 행 찾기:', result.data.filter(row => row[0] === '315835(제외)'));
@@ -5328,34 +5335,34 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
         setError(null); // 성공 시 오류 메시지 초기화
         return result.data;
       }
-      
+
       // 서버에서 오류 메시지가 있는 경우
       if (result.error && result.message && result.message.includes('Quota exceeded')) {
         setError('Google Sheets API 할당량이 초과되었습니다. 잠시 후 다시 시도해주세요.');
         return null;
       }
-      
+
       console.log('🔍 [가입자증감] 데이터 조회 실패 - success가 false 또는 데이터 없음');
       return null;
     } catch (error) {
       console.error('🔍 [가입자증감] 데이터 조회 오류:', error);
-      
+
       // Google Sheets API 할당량 초과 오류
       if (error.isQuotaExceeded) {
         setError('Google Sheets API 할당량이 초과되었습니다. 잠시 후 다시 시도해주세요.');
         return null;
       }
-      
+
       // 네트워크 오류나 CORS 오류 감지
-      if (error.isNetworkError || error.isTimeout || 
-          error.message.includes('Failed to fetch') || 
-          error.message.includes('CORS') ||
-          error.message.includes('네트워크')) {
+      if (error.isNetworkError || error.isTimeout ||
+        error.message.includes('Failed to fetch') ||
+        error.message.includes('CORS') ||
+        error.message.includes('네트워크')) {
         setError('서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요.');
       } else {
         setError('데이터를 불러올 수 없습니다.');
       }
-      
+
       return null;
     }
   };
@@ -5401,15 +5408,15 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
     const initialize = async () => {
       setLoading(true);
       setError(null);
-      
+
       try {
         console.log('🔍 [가입자증감] 컴포넌트 초기화 시작', { presentationMode });
-        
+
         // presentationMode일 때는 권한 확인을 건너뛰고 바로 데이터 로드
         if (!presentationMode) {
           const hasAccess = await checkPermission();
           console.log('🔍 [가입자증감] 권한 확인 결과:', hasAccess);
-          
+
           if (!hasAccess) {
             setError('가입자증감 기능에 접근할 권한이 없습니다.');
             setLoading(false);
@@ -5424,7 +5431,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
         // 먼저 데이터 조회 시도
         console.log('🔍 [가입자증감] 기존 데이터 조회 시도');
         let sheetData = await fetchData();
-        
+
         // 데이터가 없으면 시트 초기화
         if (!sheetData || sheetData.length === 0) {
           console.log('🔍 [가입자증감] 기존 데이터 없음, 시트 초기화 시도');
@@ -5498,18 +5505,18 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
 
   // 월별 합계 계산 함수
   const calculateMonthlyTotals = (type) => {
-    const totals = Array.from({length: 12}, (_, i) => {
+    const totals = Array.from({ length: 12 }, (_, i) => {
       const month = i + 1;
       const yearMonthKey = `${selectedYearMonth}년 ${month}월`;
       const colIndex = data[0].findIndex(header => header === yearMonthKey);
-      
+
       let total = 0;
       // Google Sheets의 실제 데이터에서 계산 (합계 행 제외)
       data.forEach(row => {
         if (row && row.length > 2 && colIndex !== -1 && colIndex < row.length) {
           // 합계 행은 제외 (이미 모든 대리점의 합계이므로)
           if (row[0] === '합계') return;
-          
+
           // type에 따라 올바른 구분값 사용
           const targetType = type === 'subscriber' ? '가입자수' : '관리수수료';
           if (row[2] === targetType) {
@@ -5539,7 +5546,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
     const printWindow = window.open('', '_blank', 'width=800,height=600');
     const currentDate = new Date().toLocaleDateString('ko-KR');
     const currentTime = new Date().toLocaleTimeString('ko-KR');
-    
+
     // 인쇄 스타일 생성
     const printStyles = `
       <style>
@@ -5652,7 +5659,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
 
     // HTML 내용 복사 (Canvas 포함)
     let printHTML = printContent.innerHTML;
-    
+
     // Material-UI 클래스 제거 및 정리
     printHTML = printHTML
       .replace(/class="[^"]*Mui[^"]*"/g, '') // MUI 클래스 제거
@@ -5660,7 +5667,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
       .replace(/style="[^"]*"/g, '') // style 속성 제거
       .replace(/aria-[^=]*="[^"]*"/g, '') // aria 속성 제거
       .replace(/data-[^=]*="[^"]*"/g, ''); // data 속성 제거
-    
+
     printWindow.document.write(`
       <html>
         <head>
@@ -5694,11 +5701,11 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
         </body>
       </html>
     `);
-    
+
     printWindow.document.close();
-    
+
     // 창이 완전히 로드된 후 처리
-    printWindow.addEventListener('load', function() {
+    printWindow.addEventListener('load', function () {
       console.log('인쇄 창이 로드되었습니다.');
     });
   };
@@ -5731,15 +5738,15 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
           console.error('315835(제외) 행 추가 API 호출 오류:', error);
         }
       }
-      
+
       // 년단위 모든 월 데이터를 일괄 저장용 데이터로 변환
       const bulkData = [];
       agentData.forEach(agent => {
-        Array.from({length: 12}, (_, i) => i + 1).forEach(month => {
+        Array.from({ length: 12 }, (_, i) => i + 1).forEach(month => {
           const yearMonthKey = `${selectedYearMonth}년 ${month}월`;
           const subscriberKey = `${agent.code}_${yearMonthKey}_가입자수`;
           const feeKey = `${agent.code}_${yearMonthKey}_관리수수료`;
-          
+
           if (inputData[subscriberKey] !== undefined && inputData[subscriberKey] !== '') {
             bulkData.push({
               yearMonth: yearMonthKey,
@@ -5758,26 +5765,26 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
           }
         });
       });
-      
+
       if (bulkData.length === 0) {
         alert('저장할 데이터가 없습니다.');
         return;
       }
-      
+
       // 배치 처리로 API 호출 빈도 제한
       const batchSize = 10; // 한 번에 10개씩 처리
       const batches = [];
       for (let i = 0; i < bulkData.length; i += batchSize) {
         batches.push(bulkData.slice(i, i + batchSize));
       }
-      
+
       let totalSuccessCount = 0;
       let totalErrorCount = 0;
-      
+
       for (let i = 0; i < batches.length; i++) {
         const batch = batches[i];
         console.log(`배치 ${i + 1}/${batches.length} 처리 중... (${batch.length}개 항목)`);
-        
+
         try {
           // 배치 저장 API 호출
           const response = await fetch(`${process.env.REACT_APP_API_URL}/api/subscriber-increase/bulk-save`, {
@@ -5788,16 +5795,16 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
             credentials: 'include',
             body: JSON.stringify({ bulkData: batch })
           });
-          
+
           if (!response.ok) {
             const errorText = await response.text();
             console.error(`배치 ${i + 1} 저장 실패:`, errorText);
             totalErrorCount += batch.length;
             continue;
           }
-          
+
           const result = await response.json();
-          
+
           if (result.success) {
             totalSuccessCount += result.results.successCount || batch.length;
             console.log(`배치 ${i + 1} 저장 성공: ${result.results.successCount || batch.length}개`);
@@ -5805,28 +5812,28 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
             totalErrorCount += batch.length;
             console.error(`배치 ${i + 1} 저장 실패:`, result.error);
           }
-          
+
           // 배치 간 대기 시간 (API 호출 빈도 제한)
           if (i < batches.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 1000)); // 1초 대기
           }
-          
+
         } catch (error) {
           console.error(`배치 ${i + 1} 처리 중 오류:`, error);
           totalErrorCount += batch.length;
         }
       }
-      
+
       // 최종 결과 알림
       if (totalErrorCount === 0) {
         alert(`년간 데이터가 성공적으로 저장되었습니다!\n저장된 항목: ${totalSuccessCount}개`);
       } else {
         alert(`년간 데이터 저장 완료!\n성공: ${totalSuccessCount}개, 실패: ${totalErrorCount}개`);
       }
-      
+
       // 데이터 새로고침
       await fetchData();
-      
+
     } catch (error) {
       console.error('년간 데이터 저장 오류:', error);
       alert('년간 데이터 저장 중 오류가 발생했습니다.');
@@ -5838,17 +5845,17 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
   // 데이터 저장 핸들러
   const handleSave = async (agentCode, type, customYearMonth = null) => {
     const yearMonth = customYearMonth || selectedYearMonth;
-    
+
     if (!yearMonth) {
       alert(timeUnit === 'month' ? '년월을 선택해주세요.' : '년도를 선택해주세요.');
       return;
     }
 
-    const inputKey = customYearMonth ? 
-      `${agentCode}_${yearMonth}_${type}` : 
+    const inputKey = customYearMonth ?
+      `${agentCode}_${yearMonth}_${type}` :
       `${agentCode}_${type}`;
     const value = inputData[inputKey];
-    
+
     if (value === undefined || value === '') {
       alert('값을 입력해주세요.');
       return;
@@ -5912,7 +5919,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
   // 년월 옵션 생성
   const getYearMonthOptions = () => {
     if (!data || data.length === 0) return [];
-    
+
     const headers = data[0];
     return headers.slice(3).map(header => ({
       value: header,
@@ -5923,10 +5930,10 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
   // 년도 옵션 생성
   const getYearOptions = () => {
     if (!data || data.length === 0) return [];
-    
+
     const headers = data[0];
     const years = new Set();
-    
+
     headers.slice(3).forEach(header => {
       if (header && header.includes('년')) {
         const yearMatch = header.match(/(\d{4})년/);
@@ -5935,22 +5942,22 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
         }
       }
     });
-    
+
     return Array.from(years).sort();
   };
 
   // 대리점 데이터 추출
   const getAgentData = () => {
     if (!data || data.length < 4) return [];
-    
+
     const agents = [];
     const agentCodes = ['306891', '315835', '316558', '314942', '316254', '315835(제외)'];
-    
+
     agentCodes.forEach(code => {
       // 모든 행을 동일하게 처리 (315835(제외) 포함)
       const subscriberRow = data.find(row => row[0] === code && row[2] === '가입자수');
       const feeRow = data.find(row => row[0] === code && row[2] === '관리수수료');
-      
+
       if (subscriberRow && feeRow) {
         console.log(`🔍 [가입자증감] ${code} 행 처리:`, { subscriberRow, feeRow });
         agents.push({
@@ -5967,12 +5974,12 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
         emptyData[0] = '315835(제외)';
         emptyData[1] = '경인(제외)';
         emptyData[2] = '가입자수';
-        
+
         const emptyFeeData = Array(data[0].length).fill('');
         emptyFeeData[0] = '315835(제외)';
         emptyFeeData[1] = '경인(제외)';
         emptyFeeData[2] = '관리수수료';
-        
+
         agents.push({
           code: code,
           displayCode: code,
@@ -5984,17 +5991,17 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
         console.log(`🔍 [가입자증감] ${code} 행을 찾을 수 없음`);
       }
     });
-    
+
     return agents;
   };
 
   // 합계 데이터 추출
   const getTotalData = () => {
     if (!data || data.length < 3) return null;
-    
+
     const totalSubscriberRow = data[1]; // 합계 - 가입자수
     const totalFeeRow = data[2]; // 합계 - 관리수수료
-    
+
     return {
       subscriberData: totalSubscriberRow,
       feeData: totalFeeRow
@@ -6081,7 +6088,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
       yearColumns.forEach(colIndex => {
         const subscriberValue = agent.subscriberData[colIndex];
         const feeValue = agent.feeData[colIndex];
-        
+
         if (subscriberValue !== '' && subscriberValue !== null && subscriberValue !== undefined) {
           yearlySubscriberTotal += parseFloat(subscriberValue) || 0;
         }
@@ -6114,80 +6121,80 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
           <Typography variant="h4" component="h1" sx={{ mb: 2, fontWeight: 'bold', color: '#f5576c' }}>
             가입자증감 관리
           </Typography>
-          
+
           {/* 통합 선택 영역 */}
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 3, 
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 3,
             mb: 3,
             p: 2,
             backgroundColor: '#f8f9fa',
             borderRadius: 2,
             border: '1px solid #e0e0e0'
           }}>
-          {/* 시간 단위 선택 */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}>
-              시간 단위:
-          </Typography>
-          <ToggleButtonGroup
-            value={timeUnit}
-            exclusive
-            onChange={(e, newUnit) => {
-              setTimeUnit(newUnit);
-              setSelectedYearMonth('');
-            }}
-            size="small"
-          >
-              <ToggleButton value="month">월단위</ToggleButton>
-              <ToggleButton value="year">년단위</ToggleButton>
-          </ToggleButtonGroup>
-        </Box>
+            {/* 시간 단위 선택 */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}>
+                시간 단위:
+              </Typography>
+              <ToggleButtonGroup
+                value={timeUnit}
+                exclusive
+                onChange={(e, newUnit) => {
+                  setTimeUnit(newUnit);
+                  setSelectedYearMonth('');
+                }}
+                size="small"
+              >
+                <ToggleButton value="month">월단위</ToggleButton>
+                <ToggleButton value="year">년단위</ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
 
-          {/* 년월/년도 선택 */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}>
-              {timeUnit === 'month' ? '대상 년월:' : '대상 년도:'}
-          </Typography>
-          <FormControl sx={{ minWidth: 200 }}>
-            <Select
-              value={selectedYearMonth}
-                label={timeUnit === 'month' ? '년월 선택' : '년도 선택'}
-              onChange={(e) => setSelectedYearMonth(e.target.value)}
-            >
-              {timeUnit === 'month' ? 
-                yearMonthOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                )) :
-                yearOptions.map((year) => (
-                  <MenuItem key={year} value={year}>
-                      {year}년
-                    </MenuItem>
-                ))
-              }
-            </Select>
-          </FormControl>
-        </Box>
+            {/* 년월/년도 선택 */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}>
+                {timeUnit === 'month' ? '대상 년월:' : '대상 년도:'}
+              </Typography>
+              <FormControl sx={{ minWidth: 200 }}>
+                <Select
+                  value={selectedYearMonth}
+                  label={timeUnit === 'month' ? '년월 선택' : '년도 선택'}
+                  onChange={(e) => setSelectedYearMonth(e.target.value)}
+                >
+                  {timeUnit === 'month' ?
+                    yearMonthOptions.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    )) :
+                    yearOptions.map((year) => (
+                      <MenuItem key={year} value={year}>
+                        {year}년
+                      </MenuItem>
+                    ))
+                  }
+                </Select>
+              </FormControl>
+            </Box>
 
-          {/* 뷰 모드 선택 */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}>
-              표시 모드:
-          </Typography>
-          <ToggleButtonGroup
-            value={viewMode}
-            exclusive
-            onChange={(e, newMode) => setViewMode(newMode)}
-            size="small"
-          >
-              <ToggleButton value="table">숫자형식</ToggleButton>
-              <ToggleButton value="chart">그래프형식</ToggleButton>
-          </ToggleButtonGroup>
+            {/* 뷰 모드 선택 */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', minWidth: 'fit-content' }}>
+                표시 모드:
+              </Typography>
+              <ToggleButtonGroup
+                value={viewMode}
+                exclusive
+                onChange={(e, newMode) => setViewMode(newMode)}
+                size="small"
+              >
+                <ToggleButton value="table">숫자형식</ToggleButton>
+                <ToggleButton value="chart">그래프형식</ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
           </Box>
-        </Box>
         </Box>
       )}
 
@@ -6212,7 +6219,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
               </Button>
             </Box>
           )}
-          
+
           {/* 합계 테이블 - presentationMode일 때는 렌더링 제외 */}
           {!presentationMode && (timeUnit === 'month' ? totalData : getYearlyData(selectedYearMonth).totalData) && (
             <Card sx={{ mb: 3 }}>
@@ -6235,11 +6242,11 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                         <TableCell sx={{ fontWeight: 'bold' }}>가입자수 합계</TableCell>
                         <TableCell sx={{ textAlign: 'right', fontWeight: 'bold' }}>
                           {timeUnit === 'month' ? (
-                            selectedYearMonth && totalData.subscriberData ? 
+                            selectedYearMonth && totalData.subscriberData ?
                               formatNumber(totalData.subscriberData[totalData.subscriberData.findIndex((_, i) => data[0][i] === selectedYearMonth)]) + '명'
                               : '-'
                           ) : (
-                            selectedYearMonth && getYearlyData(selectedYearMonth).totalData ? 
+                            selectedYearMonth && getYearlyData(selectedYearMonth).totalData ?
                               formatNumber(getYearlyData(selectedYearMonth).totalData.subscriberData[0]) + '명'
                               : '-'
                           )}
@@ -6249,11 +6256,11 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                         <TableCell sx={{ fontWeight: 'bold' }}>관리수수료 합계</TableCell>
                         <TableCell sx={{ textAlign: 'right', fontWeight: 'bold' }}>
                           {timeUnit === 'month' ? (
-                            selectedYearMonth && totalData.feeData ? 
+                            selectedYearMonth && totalData.feeData ?
                               formatNumber(totalData.feeData[totalData.feeData.findIndex((_, i) => data[0][i] === selectedYearMonth)]) + '원'
                               : '-'
                           ) : (
-                            selectedYearMonth && getYearlyData(selectedYearMonth).totalData ? 
+                            selectedYearMonth && getYearlyData(selectedYearMonth).totalData ?
                               formatNumber(getYearlyData(selectedYearMonth).totalData.feeData[0]) + '원'
                               : '-'
                           )}
@@ -6269,8 +6276,8 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
 
           {/* 월별 데이터 입력 테이블 - 개선된 디자인 */}
           {timeUnit === 'year' && selectedYearMonth && (
-            <Card sx={{ 
-              mb: 3, 
+            <Card sx={{
+              mb: 3,
               boxShadow: 3,
               ...(presentationMode && {
                 maxWidth: 1920,
@@ -6279,10 +6286,10 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
               })
             }}>
               <CardContent>
-                <Box sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'space-between', 
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
                   mb: 3,
                   p: 2,
                   background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
@@ -6291,12 +6298,12 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                 }}>
                   <Typography variant="h5" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
                     📅 {selectedYearMonth}년 월별 데이터 입력
-                </Typography>
+                  </Typography>
                   <Button
                     variant="contained"
                     onClick={handleYearlySave}
                     disabled={saving}
-                    sx={{ 
+                    sx={{
                       backgroundColor: 'rgba(255,255,255,0.2)',
                       color: 'white',
                       '&:hover': {
@@ -6307,11 +6314,11 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                     {saving ? '저장 중...' : '년간 데이터 일괄 저장'}
                   </Button>
                 </Box>
-                
-                <TableContainer 
-                  component={Paper} 
-                  variant="outlined" 
-                  sx={{ 
+
+                <TableContainer
+                  component={Paper}
+                  variant="outlined"
+                  sx={{
                     width: '100%',
                     maxWidth: 'none',
                     overflowX: 'auto',
@@ -6327,39 +6334,39 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                     <TableHead>
                       {/* 월별 헤더 */}
                       <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                        <TableCell sx={{ 
-                          fontWeight: 'bold', 
-                          width: '10%', 
+                        <TableCell sx={{
+                          fontWeight: 'bold',
+                          width: '10%',
                           minWidth: 100,
                           backgroundColor: '#e3f2fd',
                           borderRight: '1px solid #e0e0e0'
                         }}>
                           대리점코드
                         </TableCell>
-                        <TableCell sx={{ 
-                          fontWeight: 'bold', 
-                          width: '12%', 
+                        <TableCell sx={{
+                          fontWeight: 'bold',
+                          width: '12%',
                           minWidth: 80,
                           backgroundColor: '#e3f2fd',
                           borderRight: '1px solid #e0e0e0'
                         }}>
                           대리점명
                         </TableCell>
-                        <TableCell sx={{ 
-                          fontWeight: 'bold', 
-                          width: '10%', 
+                        <TableCell sx={{
+                          fontWeight: 'bold',
+                          width: '10%',
                           minWidth: 80,
                           backgroundColor: '#e3f2fd',
                           borderRight: '1px solid #e0e0e0'
                         }}>
                           구분
                         </TableCell>
-                        {Array.from({length: 12}, (_, i) => i + 1).map(month => (
-                          <TableCell key={month} sx={{ 
-                            fontWeight: 'bold', 
-                            textAlign: 'center', 
-                            width: '4%', 
-                            minWidth: 60, 
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                          <TableCell key={month} sx={{
+                            fontWeight: 'bold',
+                            textAlign: 'center',
+                            width: '4%',
+                            minWidth: 60,
                             maxWidth: 70,
                             padding: '8px 6px',
                             backgroundColor: month % 2 === 0 ? '#f8f9fa' : '#ffffff',
@@ -6369,10 +6376,10 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                           </TableCell>
                         ))}
                       </TableRow>
-                      
+
                       {/* 가입자수 합계 행 */}
                       <TableRow sx={{ backgroundColor: '#e8f5e8' }}>
-                        <TableCell sx={{ 
+                        <TableCell sx={{
                           fontWeight: 'bold',
                           textAlign: 'center',
                           backgroundColor: '#c8e6c9',
@@ -6381,7 +6388,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                         }}>
                           합계
                         </TableCell>
-                        <TableCell sx={{ 
+                        <TableCell sx={{
                           fontWeight: 'bold',
                           textAlign: 'center',
                           backgroundColor: '#c8e6c9',
@@ -6390,7 +6397,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                         }}>
                           가입자수
                         </TableCell>
-                        <TableCell sx={{ 
+                        <TableCell sx={{
                           fontWeight: 'bold',
                           textAlign: 'center',
                           backgroundColor: '#c8e6c9',
@@ -6400,7 +6407,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                           월별합계
                         </TableCell>
                         {calculateMonthlyTotals('subscriber').map((total, index) => (
-                          <TableCell key={index} sx={{ 
+                          <TableCell key={index} sx={{
                             fontWeight: 'bold',
                             textAlign: 'center',
                             backgroundColor: '#c8e6c9',
@@ -6412,10 +6419,10 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                           </TableCell>
                         ))}
                       </TableRow>
-                      
+
                       {/* 관리수수료 합계 행 */}
                       <TableRow sx={{ backgroundColor: '#f3e5f5' }}>
-                        <TableCell sx={{ 
+                        <TableCell sx={{
                           fontWeight: 'bold',
                           textAlign: 'center',
                           backgroundColor: '#e1bee7',
@@ -6424,7 +6431,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                         }}>
                           합계
                         </TableCell>
-                        <TableCell sx={{ 
+                        <TableCell sx={{
                           fontWeight: 'bold',
                           textAlign: 'center',
                           backgroundColor: '#e1bee7',
@@ -6433,7 +6440,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                         }}>
                           관리수수료
                         </TableCell>
-                        <TableCell sx={{ 
+                        <TableCell sx={{
                           fontWeight: 'bold',
                           textAlign: 'center',
                           backgroundColor: '#e1bee7',
@@ -6443,7 +6450,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                           월별합계
                         </TableCell>
                         {calculateMonthlyTotals('fee').map((total, index) => (
-                          <TableCell key={index} sx={{ 
+                          <TableCell key={index} sx={{
                             fontWeight: 'bold',
                             textAlign: 'center',
                             backgroundColor: '#e1bee7',
@@ -6460,11 +6467,11 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                       {agentData.map((agent, agentIndex) => (
                         <React.Fragment key={agent.code}>
                           {/* 가입자수 행 */}
-                          <TableRow sx={{ 
+                          <TableRow sx={{
                             backgroundColor: agentIndex % 2 === 0 ? '#fafafa' : '#ffffff',
                             '&:hover': { backgroundColor: '#f0f8ff' }
                           }}>
-                            <TableCell sx={{ 
+                            <TableCell sx={{
                               fontWeight: 'bold',
                               borderRight: '1px solid #e0e0e0',
                               backgroundColor: '#e8f5e8',
@@ -6474,7 +6481,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                             }}>
                               {agent.displayCode || agent.code}
                             </TableCell>
-                            <TableCell sx={{ 
+                            <TableCell sx={{
                               borderRight: '1px solid #e0e0e0',
                               backgroundColor: '#e8f5e8',
                               width: '12%',
@@ -6483,8 +6490,8 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                             }}>
                               {agent.name}
                             </TableCell>
-                            <TableCell sx={{ 
-                              fontWeight: 'bold', 
+                            <TableCell sx={{
+                              fontWeight: 'bold',
                               color: '#1976d2',
                               borderRight: '1px solid #e0e0e0',
                               backgroundColor: '#e8f5e8',
@@ -6494,13 +6501,13 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                             }}>
                               가입자수
                             </TableCell>
-                            {Array.from({length: 12}, (_, i) => i + 1).map(month => {
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(month => {
                               const yearMonthKey = `${selectedYearMonth}년 ${month}월`;
                               const colIndex = data[0].findIndex(header => header === yearMonthKey);
                               const currentValue = colIndex !== -1 ? agent.subscriberData[colIndex] : '';
-                              
+
                               return (
-                                <TableCell key={month} sx={{ 
+                                <TableCell key={month} sx={{
                                   textAlign: 'left',
                                   verticalAlign: 'middle', // 수직 중간 정렬
                                   padding: '6px 4px',
@@ -6514,9 +6521,9 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                     verticalAlign: 'middle'
                                   })
                                 }}>
-                              <TextField
+                                  <TextField
                                     type="text"
-                                size="small"
+                                    size="small"
                                     placeholder="0"
                                     value={formatNumberWithCommas(inputData[`${agent.code}_${yearMonthKey}_가입자수`] || currentValue || '')}
                                     onChange={(e) => {
@@ -6525,7 +6532,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                       newInputData[`${agent.code}_${yearMonthKey}_가입자수`] = rawValue;
                                       setInputData(newInputData);
                                     }}
-                                sx={{ 
+                                    sx={{
                                       width: '100%',
                                       '& .MuiInputBase-root': {
                                         position: 'relative',
@@ -6575,32 +6582,32 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                           borderColor: '#1565c0',
                                           borderWidth: '3px'
                                         }
-                                  }
-                                }}
-                                inputProps={{
-                                  style: { 
-                                    textAlign: 'left', 
-                                    fontSize: '0.8rem',
-                                    fontWeight: 'bold',
-                                    color: '#1976d2',
-                                    lineHeight: 'normal', // 줄 간격 정상화
-                                    ...(presentationMode && { textAlign: 'left' })
-                                  },
-                                  inputMode: 'numeric',
-                                  pattern: '-?[0-9,]*'
-                                }}
-                              />
-                            </TableCell>
+                                      }
+                                    }}
+                                    inputProps={{
+                                      style: {
+                                        textAlign: 'left',
+                                        fontSize: '0.8rem',
+                                        fontWeight: 'bold',
+                                        color: '#1976d2',
+                                        lineHeight: 'normal', // 줄 간격 정상화
+                                        ...(presentationMode && { textAlign: 'left' })
+                                      },
+                                      inputMode: 'numeric',
+                                      pattern: '-?[0-9,]*'
+                                    }}
+                                  />
+                                </TableCell>
                               );
                             })}
                           </TableRow>
-                          
+
                           {/* 관리수수료 행 */}
-                          <TableRow sx={{ 
+                          <TableRow sx={{
                             backgroundColor: agentIndex % 2 === 0 ? '#fafafa' : '#ffffff',
                             '&:hover': { backgroundColor: '#f0f8ff' }
                           }}>
-                            <TableCell sx={{ 
+                            <TableCell sx={{
                               fontWeight: 'bold',
                               borderRight: '1px solid #e0e0e0',
                               backgroundColor: '#f3e5f5',
@@ -6610,7 +6617,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                             }}>
                               {agent.displayCode || agent.code}
                             </TableCell>
-                            <TableCell sx={{ 
+                            <TableCell sx={{
                               borderRight: '1px solid #e0e0e0',
                               backgroundColor: '#f3e5f5',
                               width: '12%',
@@ -6619,8 +6626,8 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                             }}>
                               {agent.name}
                             </TableCell>
-                            <TableCell sx={{ 
-                              fontWeight: 'bold', 
+                            <TableCell sx={{
+                              fontWeight: 'bold',
                               color: '#7b1fa2',
                               borderRight: '1px solid #e0e0e0',
                               backgroundColor: '#f3e5f5',
@@ -6630,13 +6637,13 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                             }}>
                               관리수수료
                             </TableCell>
-                            {Array.from({length: 12}, (_, i) => i + 1).map(month => {
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(month => {
                               const yearMonthKey = `${selectedYearMonth}년 ${month}월`;
                               const colIndex = data[0].findIndex(header => header === yearMonthKey);
                               const currentValue = colIndex !== -1 ? agent.feeData[colIndex] : '';
-                              
+
                               return (
-                                <TableCell key={month} sx={{ 
+                                <TableCell key={month} sx={{
                                   textAlign: 'left',
                                   verticalAlign: 'middle', // 수직 중간 정렬
                                   padding: '6px 4px',
@@ -6650,9 +6657,9 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                     verticalAlign: 'middle'
                                   })
                                 }}>
-                              <TextField
+                                  <TextField
                                     type="text"
-                                size="small"
+                                    size="small"
                                     placeholder="0"
                                     value={formatNumberWithCommas(inputData[`${agent.code}_${yearMonthKey}_관리수수료`] || currentValue || '')}
                                     onChange={(e) => {
@@ -6661,7 +6668,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                       newInputData[`${agent.code}_${yearMonthKey}_관리수수료`] = rawValue;
                                       setInputData(newInputData);
                                     }}
-                                sx={{ 
+                                    sx={{
                                       width: '100%',
                                       '& .MuiInputBase-root': {
                                         position: 'relative',
@@ -6711,25 +6718,25 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                           borderColor: '#6a1b9a',
                                           borderWidth: '3px'
                                         }
-                                  }
-                                }}
-                                inputProps={{
-                                  style: { 
-                                    textAlign: 'left', 
-                                    fontSize: '0.7rem', // 폰트 크기 축소 (0.8rem -> 0.7rem)
-                                    fontWeight: 'bold',
-                                    color: '#7b1fa2',
-                                    lineHeight: 'normal', // 줄 간격 정상화
-                                    ...(presentationMode && { textAlign: 'left' })
-                                  },
-                                  inputMode: 'numeric',
-                                  pattern: '-?[0-9,]*'
-                                }}
-                              />
-                            </TableCell>
+                                      }
+                                    }}
+                                    inputProps={{
+                                      style: {
+                                        textAlign: 'left',
+                                        fontSize: '0.7rem', // 폰트 크기 축소 (0.8rem -> 0.7rem)
+                                        fontWeight: 'bold',
+                                        color: '#7b1fa2',
+                                        lineHeight: 'normal', // 줄 간격 정상화
+                                        ...(presentationMode && { textAlign: 'left' })
+                                      },
+                                      inputMode: 'numeric',
+                                      pattern: '-?[0-9,]*'
+                                    }}
+                                  />
+                                </TableCell>
                               );
                             })}
-                        </TableRow>
+                          </TableRow>
                         </React.Fragment>
                       ))}
                     </TableBody>
@@ -6741,8 +6748,8 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
 
           {/* 월단위 입력 테이블 */}
           {timeUnit === 'month' && selectedYearMonth && (
-            <Card sx={{ 
-              mb: 3, 
+            <Card sx={{
+              mb: 3,
               boxShadow: 3,
               ...(presentationMode && {
                 maxWidth: 1920,
@@ -6751,10 +6758,10 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
               })
             }}>
               <CardContent>
-                <Box sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'space-between', 
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
                   mb: 3,
                   p: 2,
                   background: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)',
@@ -6763,13 +6770,13 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                 }}>
                   <Typography variant="h5" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
                     📝 {selectedYearMonth} 월별 데이터 입력
-                </Typography>
+                  </Typography>
                 </Box>
-                
-                <TableContainer 
-                  component={Paper} 
-                  variant="outlined" 
-                  sx={{ 
+
+                <TableContainer
+                  component={Paper}
+                  variant="outlined"
+                  sx={{
                     width: '100%',
                     maxWidth: 'none',
                     overflowX: 'auto',
@@ -6784,41 +6791,41 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                   <Table size="small" sx={{ minWidth: 1000, width: '100%' }}>
                     <TableHead>
                       <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                        <TableCell sx={{ 
-                          fontWeight: 'bold', 
+                        <TableCell sx={{
+                          fontWeight: 'bold',
                           width: '15%',
                           backgroundColor: '#e3f2fd',
                           borderRight: '1px solid #e0e0e0'
                         }}>
                           대리점코드
                         </TableCell>
-                        <TableCell sx={{ 
-                          fontWeight: 'bold', 
+                        <TableCell sx={{
+                          fontWeight: 'bold',
                           width: '20%',
                           backgroundColor: '#e3f2fd',
                           borderRight: '1px solid #e0e0e0'
                         }}>
                           대리점명
                         </TableCell>
-                        <TableCell sx={{ 
-                          fontWeight: 'bold', 
+                        <TableCell sx={{
+                          fontWeight: 'bold',
                           width: '15%',
                           backgroundColor: '#e3f2fd',
                           borderRight: '1px solid #e0e0e0'
                         }}>
                           구분
                         </TableCell>
-                        <TableCell sx={{ 
-                            fontWeight: 'bold', 
-                            textAlign: 'center', 
+                        <TableCell sx={{
+                          fontWeight: 'bold',
+                          textAlign: 'center',
                           width: '20%',
                           backgroundColor: '#e3f2fd',
                           borderRight: '1px solid #e0e0e0'
                         }}>
                           {selectedYearMonth}
                         </TableCell>
-                        <TableCell sx={{ 
-                          fontWeight: 'bold', 
+                        <TableCell sx={{
+                          fontWeight: 'bold',
                           textAlign: 'center',
                           width: '15%',
                           backgroundColor: '#e3f2fd',
@@ -6826,8 +6833,8 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                         }}>
                           입력
                         </TableCell>
-                        <TableCell sx={{ 
-                          fontWeight: 'bold', 
+                        <TableCell sx={{
+                          fontWeight: 'bold',
                           textAlign: 'center',
                           width: '15%',
                           backgroundColor: '#e3f2fd'
@@ -6840,108 +6847,108 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                       {agentData.map((agent, agentIndex) => (
                         <React.Fragment key={agent.code}>
                           {/* 가입자수 행 */}
-                          <TableRow sx={{ 
+                          <TableRow sx={{
                             backgroundColor: agentIndex % 2 === 0 ? '#fafafa' : '#ffffff',
                             '&:hover': { backgroundColor: '#f0f8ff' }
                           }}>
-                            <TableCell sx={{ 
+                            <TableCell sx={{
                               fontWeight: 'bold',
                               borderRight: '1px solid #e0e0e0',
                               backgroundColor: '#e8f5e8'
                             }}>
                               {agent.displayCode || agent.code}
                             </TableCell>
-                            <TableCell sx={{ 
+                            <TableCell sx={{
                               borderRight: '1px solid #e0e0e0',
                               backgroundColor: '#e8f5e8'
                             }}>
                               {agent.name}
                             </TableCell>
-                            <TableCell sx={{ 
-                              fontWeight: 'bold', 
+                            <TableCell sx={{
+                              fontWeight: 'bold',
                               color: '#1976d2',
                               borderRight: '1px solid #e0e0e0',
                               backgroundColor: '#e8f5e8'
                             }}>
                               가입자수
                             </TableCell>
-                            <TableCell sx={{ 
+                            <TableCell sx={{
                               textAlign: 'right',
                               borderRight: '1px solid #e0e0e0',
                               backgroundColor: '#e8f5e8'
                             }}>
-                              {selectedYearMonth ? 
+                              {selectedYearMonth ?
                                 formatNumber(agent.subscriberData[agent.subscriberData.findIndex((_, i) => data[0][i] === selectedYearMonth)]) + '명'
                                 : '-'
                               }
                             </TableCell>
-                            <TableCell sx={{ 
-                                  textAlign: 'left',
-                                  verticalAlign: 'middle', // 수직 중간 정렬
+                            <TableCell sx={{
+                              textAlign: 'left',
+                              verticalAlign: 'middle', // 수직 중간 정렬
                               borderRight: '1px solid #e0e0e0',
+                              ...(presentationMode && {
+                                textAlign: 'left',
+                                verticalAlign: 'middle'
+                              })
+                            }}>
+                              <TextField
+                                type="number"
+                                size="small"
+                                placeholder="입력"
+                                value={inputData[`${agent.code}_가입자수`] || ''}
+                                onChange={(e) => handleInputChange(agent.code, '가입자수', e.target.value)}
+                                sx={{
+                                  width: '100%',
+                                  '& .MuiInputBase-root': {
+                                    position: 'relative', // 입력 필드 위치 명확히
+                                    display: 'flex',
+                                    alignItems: 'center', // 수직 중간 정렬
+                                    justifyContent: 'flex-start', // 수평 왼쪽 정렬
+                                    height: '100%', // 전체 높이 사용 (입력값 위치 불일치 문제 해결)
+                                  },
+                                  '& input[type=number]': {
+                                    MozAppearance: 'textfield',
+                                    textAlign: 'left', // 텍스트 왼쪽 정렬
+                                    fontSize: '0.7rem', // 폰트 크기 축소 (입력값 잘림 방지)
+                                    width: '100%', // 전체 너비 사용
+                                    padding: '8px', // 패딩 명시적 설정
+                                    lineHeight: 'normal', // 줄 간격 정상화 (입력값 위치 불일치 문제 해결)
+                                  },
+                                  '& input[type=number]::-webkit-outer-spin-button': {
+                                    WebkitAppearance: 'none',
+                                    margin: 0,
+                                  },
+                                  '& input[type=number]::-webkit-inner-spin-button': {
+                                    WebkitAppearance: 'none',
+                                    margin: 0,
+                                  },
                                   ...(presentationMode && {
-                                    textAlign: 'left',
-                                    verticalAlign: 'middle'
+                                    '& .MuiInputBase-root': {
+                                      alignItems: 'center', // 렌더링 모드에서 수직 중간 정렬
+                                      justifyContent: 'flex-start', // 렌더링 모드에서 수평 왼쪽 정렬
+                                    },
+                                    '& input[type=number]': {
+                                      textAlign: 'left', // 렌더링 모드에서 텍스트 왼쪽 정렬
+                                    }
                                   })
-                                }}>
-                                  <TextField
-                                    type="number"
-                                    size="small"
-                                    placeholder="입력"
-                                    value={inputData[`${agent.code}_가입자수`] || ''}
-                                    onChange={(e) => handleInputChange(agent.code, '가입자수', e.target.value)}
-                                    sx={{ 
-                                      width: '100%',
-                                      '& .MuiInputBase-root': {
-                                        position: 'relative', // 입력 필드 위치 명확히
-                                        display: 'flex',
-                                        alignItems: 'center', // 수직 중간 정렬
-                                        justifyContent: 'flex-start', // 수평 왼쪽 정렬
-                                        height: '100%', // 전체 높이 사용 (입력값 위치 불일치 문제 해결)
-                                      },
-                                      '& input[type=number]': {
-                                        MozAppearance: 'textfield',
-                                        textAlign: 'left', // 텍스트 왼쪽 정렬
-                                        fontSize: '0.7rem', // 폰트 크기 축소 (입력값 잘림 방지)
-                                        width: '100%', // 전체 너비 사용
-                                        padding: '8px', // 패딩 명시적 설정
-                                        lineHeight: 'normal', // 줄 간격 정상화 (입력값 위치 불일치 문제 해결)
-                                      },
-                                      '& input[type=number]::-webkit-outer-spin-button': {
-                                        WebkitAppearance: 'none',
-                                        margin: 0,
-                                      },
-                                      '& input[type=number]::-webkit-inner-spin-button': {
-                                        WebkitAppearance: 'none',
-                                        margin: 0,
-                                      },
-                                      ...(presentationMode && {
-                                        '& .MuiInputBase-root': {
-                                          alignItems: 'center', // 렌더링 모드에서 수직 중간 정렬
-                                          justifyContent: 'flex-start', // 렌더링 모드에서 수평 왼쪽 정렬
-                                        },
-                                        '& input[type=number]': {
-                                          textAlign: 'left', // 렌더링 모드에서 텍스트 왼쪽 정렬
-                                        }
-                                      })
-                                    }}
-                                    inputProps={{
-                                      style: { 
-                                        textAlign: 'left',
-                                        fontSize: '0.7rem', // 폰트 크기 축소 (입력값 잘림 방지)
-                                        ...(presentationMode && { textAlign: 'left' })
-                                      },
-                                      inputMode: 'numeric',
-                                      pattern: '-?[0-9]*'
-                                    }}
-                                    InputProps={{
-                                      inputProps: {
-                                        min: 0,
-                                        step: 1
-                                      }
-                                    }}
-                                  />
-                                </TableCell>
+                                }}
+                                inputProps={{
+                                  style: {
+                                    textAlign: 'left',
+                                    fontSize: '0.7rem', // 폰트 크기 축소 (입력값 잘림 방지)
+                                    ...(presentationMode && { textAlign: 'left' })
+                                  },
+                                  inputMode: 'numeric',
+                                  pattern: '-?[0-9]*'
+                                }}
+                                InputProps={{
+                                  inputProps: {
+                                    min: 0,
+                                    step: 1
+                                  }
+                                }}
+                              />
+                            </TableCell>
                             <TableCell sx={{ textAlign: 'center' }}>
                               <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
                                 <Button
@@ -6965,95 +6972,95 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                               </Box>
                             </TableCell>
                           </TableRow>
-                          
+
                           {/* 관리수수료 행 */}
-                          <TableRow sx={{ 
+                          <TableRow sx={{
                             backgroundColor: agentIndex % 2 === 0 ? '#fafafa' : '#ffffff',
                             '&:hover': { backgroundColor: '#f0f8ff' }
                           }}>
-                            <TableCell sx={{ 
+                            <TableCell sx={{
                               fontWeight: 'bold',
                               borderRight: '1px solid #e0e0e0',
                               backgroundColor: '#f3e5f5'
                             }}>
                               {agent.displayCode || agent.code}
                             </TableCell>
-                            <TableCell sx={{ 
+                            <TableCell sx={{
                               borderRight: '1px solid #e0e0e0',
                               backgroundColor: '#f3e5f5'
                             }}>
                               {agent.name}
                             </TableCell>
-                            <TableCell sx={{ 
-                              fontWeight: 'bold', 
+                            <TableCell sx={{
+                              fontWeight: 'bold',
                               color: '#7b1fa2',
                               borderRight: '1px solid #e0e0e0',
                               backgroundColor: '#f3e5f5'
                             }}>
                               관리수수료
                             </TableCell>
-                            <TableCell sx={{ 
+                            <TableCell sx={{
                               textAlign: 'right',
                               borderRight: '1px solid #e0e0e0',
                               backgroundColor: '#f3e5f5'
                             }}>
-                              {selectedYearMonth ? 
+                              {selectedYearMonth ?
                                 formatNumber(agent.feeData[agent.feeData.findIndex((_, i) => data[0][i] === selectedYearMonth)]) + '원'
                                 : '-'
                               }
                             </TableCell>
-                            <TableCell sx={{ 
-                                  textAlign: 'center', 
+                            <TableCell sx={{
+                              textAlign: 'center',
                               borderRight: '1px solid #e0e0e0'
-                                }}>
-                                  <TextField
-                                    type="number"
-                                    size="small"
+                            }}>
+                              <TextField
+                                type="number"
+                                size="small"
                                 placeholder="입력"
                                 value={inputData[`${agent.code}_관리수수료`] || ''}
                                 onChange={(e) => handleInputChange(agent.code, '관리수수료', e.target.value)}
-                                    sx={{ 
-                                      width: '100%',
-                                      '& .MuiInputBase-root': {
-                                        position: 'relative', // 입력 필드 위치 명확히
-                                        display: 'flex',
-                                        alignItems: 'center', // 수직 정렬
-                                        height: '100%', // 전체 높이 사용 (입력값 위치 불일치 문제 해결)
-                                      },
-                                      '& input[type=number]': {
-                                        MozAppearance: 'textfield',
-                                        textAlign: 'center', // 텍스트 중앙 정렬
-                                        width: '100%', // 전체 너비 사용
-                                        padding: '8px', // 패딩 명시적 설정
-                                        lineHeight: 'normal', // 줄 간격 정상화 (입력값 위치 불일치 문제 해결)
-                                      },
-                                      '& input[type=number]::-webkit-outer-spin-button': {
-                                        WebkitAppearance: 'none',
-                                        margin: 0,
-                                      },
-                                      '& input[type=number]::-webkit-inner-spin-button': {
-                                        WebkitAppearance: 'none',
-                                        margin: 0,
-                                      }
-                                    }}
-                                    inputProps={{
+                                sx={{
+                                  width: '100%',
+                                  '& .MuiInputBase-root': {
+                                    position: 'relative', // 입력 필드 위치 명확히
+                                    display: 'flex',
+                                    alignItems: 'center', // 수직 정렬
+                                    height: '100%', // 전체 높이 사용 (입력값 위치 불일치 문제 해결)
+                                  },
+                                  '& input[type=number]': {
+                                    MozAppearance: 'textfield',
+                                    textAlign: 'center', // 텍스트 중앙 정렬
+                                    width: '100%', // 전체 너비 사용
+                                    padding: '8px', // 패딩 명시적 설정
+                                    lineHeight: 'normal', // 줄 간격 정상화 (입력값 위치 불일치 문제 해결)
+                                  },
+                                  '& input[type=number]::-webkit-outer-spin-button': {
+                                    WebkitAppearance: 'none',
+                                    margin: 0,
+                                  },
+                                  '& input[type=number]::-webkit-inner-spin-button': {
+                                    WebkitAppearance: 'none',
+                                    margin: 0,
+                                  }
+                                }}
+                                inputProps={{
                                   style: { textAlign: 'center' },
-                                      inputMode: 'numeric',
-                                      pattern: '-?[0-9]*'
-                                    }}
-                                    InputProps={{
-                                      inputProps: {
-                                        min: 0,
-                                        step: 1
-                                      }
-                                    }}
-                                  />
-                                </TableCell>
+                                  inputMode: 'numeric',
+                                  pattern: '-?[0-9]*'
+                                }}
+                                InputProps={{
+                                  inputProps: {
+                                    min: 0,
+                                    step: 1
+                                  }
+                                }}
+                              />
+                            </TableCell>
                             <TableCell sx={{ textAlign: 'center' }}>
                               <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-                  <Button
+                                <Button
                                   size="small"
-                    variant="contained"
+                                  variant="contained"
                                   color="secondary"
                                   onClick={() => handleSave(agent.code, '관리수수료')}
                                   disabled={saving || !selectedYearMonth}
@@ -7068,25 +7075,25 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                   disabled={saving || !selectedYearMonth}
                                 >
                                   삭제
-                  </Button>
-                </Box>
-                                </TableCell>
+                                </Button>
+                              </Box>
+                            </TableCell>
                           </TableRow>
                         </React.Fragment>
                       ))}
                     </TableBody>
                   </Table>
                 </TableContainer>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
           )}
-          
+
           {/* presentationMode일 때는 그래프도 함께 표시 */}
           {presentationMode && (
             <>
               {/* 가입자수 추이 그래프 */}
-              <Card sx={{ 
-                mb: 3, 
+              <Card sx={{
+                mb: 3,
                 width: '100%',
                 ...(presentationMode && {
                   maxWidth: 1920,
@@ -7100,9 +7107,9 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                   </Typography>
                   <Box sx={{ height: 500, width: '100%' }}>
                     {timeUnit === 'year' && selectedYearMonth ? (
-                      <Line 
+                      <Line
                         data={{
-                          labels: Array.from({length: 12}, (_, i) => `${i + 1}월`),
+                          labels: Array.from({ length: 12 }, (_, i) => `${i + 1}월`),
                           datasets: agentData.map((agent, index) => {
                             const colors = [
                               'rgba(54, 162, 235, 1)',   // 파란색
@@ -7111,7 +7118,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                               'rgba(255, 205, 86, 1)',   // 노란색
                               'rgba(153, 102, 255, 1)'   // 보라색
                             ];
-                            const monthData = Array.from({length: 12}, (_, i) => {
+                            const monthData = Array.from({ length: 12 }, (_, i) => {
                               const yearMonthKey = `${selectedYearMonth}년 ${i + 1}월`;
                               const colIndex = data[0].findIndex(header => header === yearMonthKey);
                               if (colIndex !== -1) {
@@ -7120,7 +7127,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                               }
                               return 0;
                             });
-                            
+
                             return {
                               label: `${agent.name} (${agent.code})`,
                               data: monthData,
@@ -7161,29 +7168,29 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                             },
                             datalabels: {
                               display: true,
-                              color: function(context) {
+                              color: function (context) {
                                 return context.dataset.borderColor || '#1976d2';
                               },
                               font: {
                                 size: 10,
                                 weight: 'bold'
                               },
-                              formatter: function(value) {
+                              formatter: function (value) {
                                 return value > 0 ? value.toLocaleString() : '';
                               },
-                              anchor: function(context) {
+                              anchor: function (context) {
                                 return context.datasetIndex % 2 === 0 ? 'end' : 'start';
                               },
-                              align: function(context) {
+                              align: function (context) {
                                 if (context.datasetIndex <= 1) return 'top';
                                 if (context.datasetIndex <= 3) return 'bottom';
                                 return 'top';
                               },
-                              offset: function(context) {
+                              offset: function (context) {
                                 return 10 + (context.datasetIndex * 12);
                               },
                               backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                              borderColor: function(context) {
+                              borderColor: function (context) {
                                 return context.dataset.borderColor || '#1976d2';
                               },
                               borderRadius: 4,
@@ -7223,7 +7230,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                   size: 10,
                                   weight: 'bold'
                                 },
-                                callback: function(value) {
+                                callback: function (value) {
                                   return value.toLocaleString() + '명';
                                 }
                               }
@@ -7232,7 +7239,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                         }}
                       />
                     ) : (
-                      <Bar 
+                      <Bar
                         data={{
                           labels: agentData.map(agent => `${agent.name}\n(${agent.code})`),
                           datasets: [{
@@ -7291,7 +7298,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                   size: 10,
                                   weight: 'bold'
                                 },
-                                callback: function(value) {
+                                callback: function (value) {
                                   return value.toLocaleString() + '명';
                                 }
                               }
@@ -7305,8 +7312,8 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
               </Card>
 
               {/* 관리수수료 추이 그래프 */}
-              <Card sx={{ 
-                mb: 3, 
+              <Card sx={{
+                mb: 3,
                 width: '100%',
                 ...(presentationMode && {
                   maxWidth: 1920,
@@ -7320,9 +7327,9 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                   </Typography>
                   <Box sx={{ height: 500, width: '100%' }}>
                     {timeUnit === 'year' && selectedYearMonth ? (
-                      <Line 
+                      <Line
                         data={{
-                          labels: Array.from({length: 12}, (_, i) => `${i + 1}월`),
+                          labels: Array.from({ length: 12 }, (_, i) => `${i + 1}월`),
                           datasets: agentData.map((agent, index) => {
                             const colors = [
                               'rgba(54, 162, 235, 1)',   // 파란색
@@ -7331,7 +7338,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                               'rgba(255, 205, 86, 1)',   // 노란색
                               'rgba(153, 102, 255, 1)'   // 보라색
                             ];
-                            const monthData = Array.from({length: 12}, (_, i) => {
+                            const monthData = Array.from({ length: 12 }, (_, i) => {
                               const yearMonthKey = `${selectedYearMonth}년 ${i + 1}월`;
                               const colIndex = data[0].findIndex(header => header === yearMonthKey);
                               if (colIndex !== -1) {
@@ -7340,7 +7347,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                               }
                               return 0;
                             });
-                            
+
                             return {
                               label: `${agent.name} (${agent.code})`,
                               data: monthData,
@@ -7381,29 +7388,29 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                             },
                             datalabels: {
                               display: true,
-                              color: function(context) {
+                              color: function (context) {
                                 return context.dataset.borderColor || '#388e3c';
                               },
                               font: {
                                 size: 10,
                                 weight: 'bold'
                               },
-                              formatter: function(value) {
+                              formatter: function (value) {
                                 return value > 0 ? value.toLocaleString() : '';
                               },
-                              anchor: function(context) {
+                              anchor: function (context) {
                                 return context.datasetIndex % 2 === 0 ? 'end' : 'start';
                               },
-                              align: function(context) {
+                              align: function (context) {
                                 if (context.datasetIndex <= 1) return 'top';
                                 if (context.datasetIndex <= 3) return 'bottom';
                                 return 'top';
                               },
-                              offset: function(context) {
+                              offset: function (context) {
                                 return 10 + (context.datasetIndex * 12);
                               },
                               backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                              borderColor: function(context) {
+                              borderColor: function (context) {
                                 return context.dataset.borderColor || '#388e3c';
                               },
                               borderRadius: 4,
@@ -7443,7 +7450,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                   size: 10,
                                   weight: 'bold'
                                 },
-                                callback: function(value) {
+                                callback: function (value) {
                                   return value.toLocaleString() + '원';
                                 }
                               }
@@ -7452,7 +7459,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                         }}
                       />
                     ) : (
-                      <Line 
+                      <Line
                         data={{
                           labels: agentData.map(agent => `${agent.name}\n(${agent.code})`),
                           datasets: [{
@@ -7513,7 +7520,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                                   size: 10,
                                   weight: 'bold'
                                 },
-                                callback: function(value) {
+                                callback: function (value) {
                                   return value.toLocaleString() + '원';
                                 }
                               }
@@ -7546,7 +7553,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
               🖨️ 인쇄하기
             </Button>
           </Box>
-          
+
           {/* 그래프 표시 */}
           <Card sx={{ mb: 3, width: '100%' }}>
             <CardContent sx={{ width: '100%' }}>
@@ -7555,9 +7562,9 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
               </Typography>
               <Box sx={{ height: 650, width: '100%' }}>
                 {timeUnit === 'year' && selectedYearMonth ? (
-                  <Line 
+                  <Line
                     data={{
-                      labels: Array.from({length: 12}, (_, i) => `${i + 1}월`),
+                      labels: Array.from({ length: 12 }, (_, i) => `${i + 1}월`),
                       datasets: agentData.map((agent, index) => {
                         const colors = [
                           'rgba(54, 162, 235, 1)',   // 파란색
@@ -7566,7 +7573,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                           'rgba(255, 205, 86, 1)',   // 노란색
                           'rgba(153, 102, 255, 1)'   // 보라색
                         ];
-                        const monthData = Array.from({length: 12}, (_, i) => {
+                        const monthData = Array.from({ length: 12 }, (_, i) => {
                           const yearMonthKey = `${selectedYearMonth}년 ${i + 1}월`;
                           const colIndex = data[0].findIndex(header => header === yearMonthKey);
                           if (colIndex !== -1) {
@@ -7575,7 +7582,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                           }
                           return 0;
                         });
-                        
+
                         return {
                           label: `${agent.name} (${agent.code})`,
                           data: monthData,
@@ -7616,30 +7623,30 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                         },
                         datalabels: {
                           display: true,
-                          color: function(context) {
+                          color: function (context) {
                             return context.dataset.borderColor || '#1976d2';
                           },
                           font: {
                             size: 12,
                             weight: 'bold'
                           },
-                          formatter: function(value, context) {
+                          formatter: function (value, context) {
                             return value > 0 ? value.toLocaleString() : '';
                           },
                           // 라벨 위치 다양화 - 그래프 선과 일관성 있게 배치
-                          anchor: function(context) {
+                          anchor: function (context) {
                             const datasetIndex = context.datasetIndex;
                             // 짝수는 end, 홀수는 start로 일관성 유지
                             return datasetIndex % 2 === 0 ? 'end' : 'start';
                           },
-                          align: function(context) {
+                          align: function (context) {
                             const datasetIndex = context.datasetIndex;
                             // 0,1은 top, 2,3은 bottom, 4는 top으로 교대
                             if (datasetIndex <= 1) return 'top';
                             if (datasetIndex <= 3) return 'bottom';
                             return 'top';
                           },
-                          offset: function(context) {
+                          offset: function (context) {
                             const datasetIndex = context.datasetIndex;
                             // 그래프 선 순서에 맞춰 일정한 간격으로 배치
                             const baseOffset = 10;
@@ -7647,7 +7654,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                             return baseOffset + (datasetIndex * spacing);
                           },
                           backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                          borderColor: function(context) {
+                          borderColor: function (context) {
                             return context.dataset.borderColor || '#1976d2';
                           },
                           borderRadius: 6,
@@ -7689,7 +7696,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                               size: 12,
                               weight: 'bold'
                             },
-                            callback: function(value) {
+                            callback: function (value) {
                               return value.toLocaleString() + '명';
                             }
                           }
@@ -7698,7 +7705,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                     }}
                   />
                 ) : (
-                  <Bar 
+                  <Bar
                     data={{
                       labels: agentData.map(agent => `${agent.name}\n(${agent.code})`),
                       datasets: [{
@@ -7757,7 +7764,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                               size: 12,
                               weight: 'bold'
                             },
-                            callback: function(value) {
+                            callback: function (value) {
                               return value.toLocaleString() + '명';
                             }
                           }
@@ -7777,9 +7784,9 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
               </Typography>
               <Box sx={{ height: 650, width: '100%' }}>
                 {timeUnit === 'year' && selectedYearMonth ? (
-                  <Line 
+                  <Line
                     data={{
-                      labels: Array.from({length: 12}, (_, i) => `${i + 1}월`),
+                      labels: Array.from({ length: 12 }, (_, i) => `${i + 1}월`),
                       datasets: agentData.map((agent, index) => {
                         const colors = [
                           'rgba(54, 162, 235, 1)',   // 파란색
@@ -7788,7 +7795,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                           'rgba(255, 205, 86, 1)',   // 노란색
                           'rgba(153, 102, 255, 1)'   // 보라색
                         ];
-                        const monthData = Array.from({length: 12}, (_, i) => {
+                        const monthData = Array.from({ length: 12 }, (_, i) => {
                           const yearMonthKey = `${selectedYearMonth}년 ${i + 1}월`;
                           const colIndex = data[0].findIndex(header => header === yearMonthKey);
                           if (colIndex !== -1) {
@@ -7797,7 +7804,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                           }
                           return 0;
                         });
-                        
+
                         return {
                           label: `${agent.name} (${agent.code})`,
                           data: monthData,
@@ -7838,30 +7845,30 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                         },
                         datalabels: {
                           display: true,
-                          color: function(context) {
+                          color: function (context) {
                             return context.dataset.borderColor || '#388e3c';
                           },
                           font: {
                             size: 12,
                             weight: 'bold'
                           },
-                          formatter: function(value, context) {
+                          formatter: function (value, context) {
                             return value > 0 ? value.toLocaleString() : '';
                           },
                           // 라벨 위치 다양화 - 그래프 선과 일관성 있게 배치
-                          anchor: function(context) {
+                          anchor: function (context) {
                             const datasetIndex = context.datasetIndex;
                             // 짝수는 end, 홀수는 start로 일관성 유지
                             return datasetIndex % 2 === 0 ? 'end' : 'start';
                           },
-                          align: function(context) {
+                          align: function (context) {
                             const datasetIndex = context.datasetIndex;
                             // 0,1은 top, 2,3은 bottom, 4는 top으로 교대
                             if (datasetIndex <= 1) return 'top';
                             if (datasetIndex <= 3) return 'bottom';
                             return 'top';
                           },
-                          offset: function(context) {
+                          offset: function (context) {
                             const datasetIndex = context.datasetIndex;
                             // 그래프 선 순서에 맞춰 일정한 간격으로 배치
                             const baseOffset = 10;
@@ -7869,7 +7876,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                             return baseOffset + (datasetIndex * spacing);
                           },
                           backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                          borderColor: function(context) {
+                          borderColor: function (context) {
                             return context.dataset.borderColor || '#388e3c';
                           },
                           borderRadius: 6,
@@ -7911,7 +7918,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                               size: 12,
                               weight: 'bold'
                             },
-                            callback: function(value) {
+                            callback: function (value) {
                               return value.toLocaleString() + '원';
                             }
                           }
@@ -7920,7 +7927,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                     }}
                   />
                 ) : (
-                  <Line 
+                  <Line
                     data={{
                       labels: agentData.map(agent => `${agent.name}\n(${agent.code})`),
                       datasets: [{
@@ -7981,7 +7988,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
                               size: 12,
                               weight: 'bold'
                             },
-                            callback: function(value) {
+                            callback: function (value) {
                               return value.toLocaleString() + '원';
                             }
                           }
@@ -8002,10 +8009,10 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
 // 준비 중 탭 컴포넌트
 function ComingSoonTab() {
   return (
-    <Paper 
-      elevation={3} 
-      sx={{ 
-        p: 4, 
+    <Paper
+      elevation={3}
+      sx={{
+        p: 4,
         textAlign: 'center',
         background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
         color: 'white',

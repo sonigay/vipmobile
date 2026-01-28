@@ -706,31 +706,121 @@ function createInventoryRoutes(context) {
         byColor[color].push(row);
       });
 
-      cacheManager.set(cacheKey, byColor, 5 * 60 * 1000);
-      res.json(byColor);
+      const result = {
+        success: true,
+        data: byColor
+      };
+      cacheManager.set(cacheKey, result, 5 * 60 * 1000);
+      res.json(result);
     } catch (error) {
       console.error('Error fetching inventory status by color:', error);
       res.status(500).json({ error: error.message });
     }
   });
 
-  // GET /api/inventory-inspection - 재고 검수
-  router.get('/api/inventory-inspection', async (req, res) => {
+  // POST /api/inventory-inspection - 재고 비교 검수
+  router.post('/api/inventory-inspection', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
 
-      const cacheKey = 'inventory_inspection';
-      const cached = cacheManager.get(cacheKey);
-      if (cached) return res.json(cached);
+      console.log('🔍 재고 비교 검수 시작...');
 
-      const values = await getSheetValues('재고검수');
-      const data = values.slice(1);
+      // 1. 병렬로 데이터 로드
+      const [masterValues, phoneklValues, normValues, confirmedValues] = await Promise.all([
+        getSheetValues('마스터재고'),
+        getSheetValues('폰클재고데이터'),
+        getSheetValues('모델명정규화'),
+        getSheetValues('확인된미확인재고')
+      ]);
 
-      cacheManager.set(cacheKey, data, 5 * 60 * 1000);
-      res.json(data);
+      // 2. 마스터재고 파싱
+      const masterRows = masterValues.slice(3); // 4행부터 데이터
+      const masterInventory = masterRows.map(row => ({
+        modelCode: row[9] || '',     // J열: 모델코드
+        color: row[11] || '',        // L열: 색상
+        serialNumber: row[12] || '', // M열: 시리얼
+        outletCode: row[17] || '',   // R열: 출고점코드
+        firstInDate: row[23] || '',  // X열: 최초입고일
+        dealerInDate: row[26] || '', // AA열: 대리점입고일
+        normalizedSerial: (row[12] || '').toString().trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
+      })).filter(item => item.serialNumber);
+
+      // 3. 폰클재고 파싱
+      const phoneklRows = phoneklValues.slice(3); // 4행부터 데이터
+      const phoneklMap = new Map();
+      phoneklRows.forEach(row => {
+        const serial = (row[11] || '').toString().trim(); // L열: 일련번호
+        if (serial) {
+          const normalized = serial.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+          phoneklMap.set(normalized, {
+            serialNumber: serial,
+            modelName: row[13] || '', // N열: 모델명
+            inPrice: row[17] || '',   // R열: 입고가
+            inStore: row[20] || '',   // U열: 입고처
+            outStore: row[21] || ''   // V열: 출고처
+          });
+        }
+      });
+
+      // 4. 모델명 정규화 맵
+      const normalizationMap = {};
+      if (normValues && normValues.length > 1) {
+        normValues.slice(1).forEach(row => {
+          if (row[0] && row[1]) normalizationMap[row[0]] = row[1];
+        });
+      }
+
+      // 5. 확인된 재고 셋
+      const confirmedSet = new Set();
+      if (confirmedValues && confirmedValues.length > 1) {
+        confirmedValues.slice(1).forEach(row => {
+          const serial = (row[4] || '').toString().trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+          if (serial) confirmedSet.add(serial);
+        });
+      }
+
+      // 6. 비교 수행
+      const matched = [];
+      const unmatched = [];
+      const confirmed = [];
+      const needsNormalization = new Set();
+
+      masterInventory.forEach(item => {
+        const phoneklItem = phoneklMap.get(item.normalizedSerial);
+        if (phoneklItem) {
+          matched.push({ ...item, phoneklData: phoneklItem });
+        } else if (confirmedSet.has(item.normalizedSerial)) {
+          confirmed.push(item);
+        } else {
+          unmatched.push(item);
+        }
+
+        if (item.modelCode && !normalizationMap[item.modelCode]) {
+          needsNormalization.add(item.modelCode);
+        }
+      });
+
+      const result = {
+        success: true,
+        data: {
+          statistics: {
+            totalCount: masterInventory.length,
+            matchedCount: matched.length,
+            unmatchedCount: unmatched.length,
+            confirmedCount: confirmed.length
+          },
+          matched,
+          unmatched,
+          confirmed,
+          needsNormalization: Array.from(needsNormalization),
+          normalizationMap
+        }
+      };
+
+      res.json(result);
     } catch (error) {
-      console.error('Error fetching inventory inspection:', error);
-      res.status(500).json({ error: error.message });
+      console.error('Error in inventory inspection:', error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
