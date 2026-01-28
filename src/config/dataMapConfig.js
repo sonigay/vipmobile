@@ -165,11 +165,20 @@ const DATA_MAP_CONFIG = {
     // 시트: 사전예약사이트, 마당접수, 온세일, 모바일가입내역, POS코드변경설정
     'basicMode': {
         tabs: {
-            'reservation': { label: '사전예약', sheet: '사전예약사이트', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/reservation/list' },
-            'madang': { label: '마당접수', sheet: '마당접수', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/reservation-data/yard-receipt' },
-            'onsale': { label: '온세일', sheet: '온세일', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/onsale/active-links' },
-            'mobile': { label: '모바일가입', sheet: '모바일가입내역', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/reservation/list' },
-            'posCode': { label: 'POS코드설정', sheet: 'POS코드변경설정', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/pos-code-mappings' }
+            'mapData': {
+                label: '지도 데이터 (매장+재고)',
+                sheet: '폰클출고처데이터 / 폰클재고데이터',
+                range: 'A:Z',
+                headerRow: 1,
+                apiEndpoint: '/api/stores'
+            },
+            'mapOptions': {
+                label: '지도 노출 옵션',
+                sheet: '지도재고노출옵션',
+                range: 'A:F',
+                headerRow: 1,
+                apiEndpoint: '/api/map-display-option/users'
+            }
         }
     },
 
