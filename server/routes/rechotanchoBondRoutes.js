@@ -31,12 +31,12 @@ function createRechotanchoBondRoutes(context) {
   router.get('/api/rechotancho-bond/all-data', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      
-      const cacheKey = 'rechotancho_bond_all_data';
+
+      const cacheKey = 'jaecho_damcho_bond_all_data';
       const cached = cacheManager.get(cacheKey);
       if (cached) return res.json(cached);
 
-      const values = await getSheetValues('레초탄초채권');
+      const values = await getSheetValues('재초담초채권');
       const data = values.slice(1);
 
       cacheManager.set(cacheKey, data, 5 * 60 * 1000);
@@ -51,7 +51,7 @@ function createRechotanchoBondRoutes(context) {
   router.get('/api/rechotancho-bond/history', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      const values = await getSheetValues('레초탄초채권이력');
+      const values = await getSheetValues('재초담초채권_내역');
       res.json(values.slice(1));
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -64,7 +64,7 @@ function createRechotanchoBondRoutes(context) {
       if (!requireSheetsClient(res)) return;
       const { timestamp } = req.params;
 
-      const values = await getSheetValues('레초탄초채권');
+      const values = await getSheetValues('재초담초채권');
       const data = values.slice(1).find(row => row[0] === timestamp);
 
       if (!data) {
@@ -86,13 +86,13 @@ function createRechotanchoBondRoutes(context) {
       await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.append({
           spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '레초탄초채권!A:Z',
+          range: '재초담초채권!A:Z',
           valueInputOption: 'RAW',
           resource: { values: [data] }
         })
       );
 
-      cacheManager.deletePattern('rechotancho_bond');
+      cacheManager.deletePattern('jaecho_damcho_bond');
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error.message });

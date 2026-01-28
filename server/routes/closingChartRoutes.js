@@ -83,13 +83,13 @@ function createClosingChartRoutes(context) {
         salesTargetData,
         phoneklHomeData
       ] = await Promise.all([
-        getSheetValues('폰클개통데이터!A:BZ'), // 범위 명시
-        getSheetValues('폰클출고처데이터!A:Z'),
-        getSheetValues('폰클재고데이터!A:Z'),
-        getSheetValues('운영모델!A:Z'),
-        getSheetValues('거래처정보!A:Z'),
-        getSheetValues('영업사원목표!A:Z'),
-        getSheetValues('폰클홈데이터!A:Z')
+        getSheetValues('폰클개통데이터'),
+        getSheetValues('폰클출고처데이터'),
+        getSheetValues('폰클재고데이터'),
+        getSheetValues('운영모델'),
+        getSheetValues('거래처정보'),
+        getSheetValues('영업사원목표'),
+        getSheetValues('폰클홈데이터')
       ]);
 
       // 제외 조건 설정
@@ -118,7 +118,11 @@ function createClosingChartRoutes(context) {
 
     } catch (error) {
       console.error('마감장표 데이터 조회 오류:', error);
-      res.status(500).json({ error: '마감장표 데이터 조회 중 오류가 발생했습니다.' });
+      console.error(error.stack);
+      res.status(500).json({
+        error: '마감장표 데이터 조회 중 오류가 발생했습니다.',
+        details: error.message
+      });
     }
   });
 

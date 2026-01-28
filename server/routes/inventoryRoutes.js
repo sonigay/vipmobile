@@ -48,14 +48,14 @@ function createInventoryRoutes(context) {
   // 시트 데이터 가져오기 헬퍼 함수
   async function getSheetValues(sheetName, spreadsheetId = null) {
     const targetSpreadsheetId = spreadsheetId || sheetsClient.SPREADSHEET_ID;
-    
+
     const response = await rateLimiter.execute(() =>
       sheetsClient.sheets.spreadsheets.values.get({
         spreadsheetId: targetSpreadsheetId,
         range: `${sheetName}!A:Z`
       })
     );
-    
+
     return response.data.values || [];
   }
 
@@ -85,29 +85,96 @@ function createInventoryRoutes(context) {
       const reservationRows = reservationValues.slice(1);
 
       // 재고 배정 상태 계산 로직
-      const assignmentStatus = {
-        totalInventory: inventoryRows.length,
-        totalReservations: reservationRows.length,
-        assigned: 0,
-        unassigned: 0,
-        pending: 0
+      // 1. 필요한 시트 데이터 병렬로 가져오기 (추가 시트 포함)
+      const [phoneklInventoryValues, reservationSiteValues, phoneklStoreValues, phoneklActivationValues, normalizationValues] = await Promise.all([
+        getSheetValues('폰클재고데이터'),
+        getSheetValues('사전예약사이트'),
+        getSheetValues('폰클출고처데이터'),
+        getSheetValues('폰클개통데이터'),
+        getSheetValues('정규화작업')
+      ]);
+
+      if (!phoneklInventoryValues || phoneklInventoryValues.length < 2) {
+        throw new Error('폰클재고데이터를 가져올 수 없습니다.');
+      }
+
+      // 2. 정규화 규칙 로드
+      const normalizationRules = new Map();
+      if (normalizationValues && normalizationValues.length > 1) {
+        normalizationValues.slice(1).forEach(row => {
+          if (row.length >= 3) {
+            const reservationSite = (row[1] || '').toString().trim(); // C열
+            const phoneklModel = (row[2] || '').toString().trim(); // D열
+            const phoneklColor = (row[3] || '').toString().trim(); // E열
+
+            if (reservationSite && phoneklModel && phoneklColor) {
+              const key = reservationSite.replace(/\s*\|\s*/g, ' ').trim();
+              normalizationRules.set(key, { phoneklModel, phoneklColor });
+            }
+          }
+        });
+      }
+
+      // 3. 폰클출고처데이터에서 POS코드 매핑 생성
+      const storePosCodeMapping = new Map();
+      if (phoneklStoreValues && phoneklStoreValues.length > 1) {
+        phoneklStoreValues.slice(1).forEach(row => {
+          if (row.length >= 16) {
+            const storeName = (row[14] || '').toString().trim(); // O열: 출고처명
+            const posCode = (row[15] || '').toString().trim(); // P열: POS코드
+
+            if (storeName && posCode) {
+              storePosCodeMapping.set(storeName, posCode);
+            }
+          }
+        });
+      }
+
+      // 4. 폰클재고데이터에서 사용 가능한 재고 정보 생성
+      const availableInventory = {}; // 변환: Map -> Object for JSON response
+      // Legacy logic structure adaptation
+      phoneklInventoryValues.slice(1).forEach(row => {
+        if (row.length >= 22) {
+          const serialNumber = (row[11] || '').toString().trim(); // L열
+          const modelCapacity = (row[13] || '').toString().trim(); // N열
+          const color = (row[14] || '').toString().trim(); // O열
+          const storeName = (row[21] || '').toString().trim(); // V열
+          const status = (row[12] || '').toString().trim(); // M열: 재고상태 (확인 필요)
+
+          // 재고상태가 '가용'이거나 비어있는 경우 등 조건 확인 필요 (레거시 코드에는 명시적 필터링이 없어 보이나 확인 필요)
+          // 여기서는 POS 코드로 매핑 가능한 것만 집계
+
+          if (modelCapacity && storeName) {
+            const posCode = storePosCodeMapping.get(storeName);
+            if (posCode) {
+              let modelWithColor = modelCapacity;
+              if (!modelCapacity.includes('|') && color) {
+                modelWithColor = `${modelCapacity} | ${color}`;
+              }
+              const key = `${modelWithColor}_${posCode}`;
+
+              if (!availableInventory[key]) {
+                availableInventory[key] = 0;
+              }
+              availableInventory[key]++;
+            }
+          }
+        }
+      });
+
+      // 5. 결과 반환
+      const responseData = {
+        success: true,
+        assignmentStatus: availableInventory,
+        normalizationRules: Object.fromEntries(normalizationRules),
+        storePosCodeMapping: Object.fromEntries(storePosCodeMapping),
+        lastUpdated: new Date()
       };
 
-      // 배정 상태 집계
-      inventoryRows.forEach(row => {
-        const status = row[inventoryHeaders.indexOf('배정상태')] || '';
-        if (status === '배정완료') assignmentStatus.assigned++;
-        else if (status === '미배정') assignmentStatus.unassigned++;
-        else if (status === '보류') assignmentStatus.pending++;
-      });
-
       // 캐시 저장 (5분)
-      cacheManager.set(cacheKey, assignmentStatus, 5 * 60 * 1000);
+      cacheManager.set(cacheKey, responseData, 5 * 60 * 1000);
 
-      res.json({
-        success: true,
-        data: assignmentStatus
-      });
+      res.json(responseData);
     } catch (error) {
       console.error('Error calculating assignment status:', error);
       res.status(500).json({
