@@ -35,11 +35,11 @@ const DATA_MAP_CONFIG = {
     // 시트: 정책_기본정보 , 정책_승인이력 , 정책모드공지사항
     'policy': {
         tabs: {
-            'additional': { label: '추가정책', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1 },
-            'policyList': { label: '정책표목록', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1 },
-            'policyCreate': { label: '정책표생성', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1 },
-            'policySettings': { label: '정책표생성설정', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1 },
-            'notice': { label: '공지사항', sheet: '정책모드공지사항', range: 'A:I', headerRow: 2 }
+            'additional': { label: '추가정책', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1, apiEndpoint: '/api/policies' },
+            'policyList': { label: '정책표목록', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1, apiEndpoint: '/api/policies' },
+            'policyCreate': { label: '정책표생성', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1, apiEndpoint: '/api/policies' },
+            'policySettings': { label: '정책표생성설정', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1, apiEndpoint: '/api/policies' },
+            'notice': { label: '공지사항', sheet: '정책모드공지사항', range: 'A:I', headerRow: 2, apiEndpoint: '/api/policy-notices' }
         }
     },
 
@@ -48,9 +48,9 @@ const DATA_MAP_CONFIG = {
     'budget': {
         tabs: {
             'faceValue': { label: '액면예산', sheet: '액면예산', range: 'A:AG', headerRow: 1 },
-            'policyGroup': { label: '정책그룹관리', sheet: '예산_정책그룹관리', range: 'A:B', headerRow: 1 },
-            'userSheet': { label: '사용자시트관리', sheet: '예산_사용자시트관리', range: 'A:G', headerRow: 1 },
-            'targetMonth': { label: '대상월관리', sheet: '예산_대상월관리', range: 'A:Z', headerRow: 1 }
+            'policyGroup': { label: '정책그룹관리', sheet: '예산_정책그룹관리', range: 'A:B', headerRow: 1, apiEndpoint: '/api/budget/policy-groups' },
+            'userSheet': { label: '사용자시트관리', sheet: '예산_사용자시트관리', range: 'A:G', headerRow: 1, apiEndpoint: '/api/budget/user-sheets-v2' },
+            'targetMonth': { label: '대상월관리', sheet: '예산_대상월관리', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/budget/month-sheets' }
         }
     },
 
@@ -189,7 +189,7 @@ const DATA_MAP_CONFIG = {
     'onSaleManagement': {
         tabs: {
             'links': { label: '온세일링크', sheet: '온세일링크관리', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/onsale/active-links' },
-            'data': { label: '온세일', sheet: '온세일', range: 'A:Z', headerRow: 1 }
+            'data': { label: '온세일', sheet: '온세일', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/onsale/active-links' }
         }
     },
 
@@ -197,7 +197,7 @@ const DATA_MAP_CONFIG = {
     // 시트: 온세일
     'onSaleReception': {
         tabs: {
-            'reception': { label: '온세일접수', sheet: '온세일', range: 'A:Z', headerRow: 1 }
+            'reception': { label: '온세일접수', sheet: '온세일', range: 'A:Z', headerRow: 1, apiEndpoint: '/api/onsale/active-links' }
         }
     },
 
@@ -205,7 +205,7 @@ const DATA_MAP_CONFIG = {
     // 시트: 정책_기본정보 , 정책모드공지사항
     'generalPolicy': {
         tabs: {
-            'basic': { label: '기본정보', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1, apiEndpoint: '/api/policy/list' },
+            'basic': { label: '기본정보', sheet: '정책_기본정보 ', range: 'A:AC', headerRow: 1, apiEndpoint: '/api/policies' },
             'notice': { label: '공지사항', sheet: '정책모드공지사항', range: 'A:I', headerRow: 2, apiEndpoint: '/api/policy-notices' }
         }
     },
