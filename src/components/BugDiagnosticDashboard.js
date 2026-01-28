@@ -400,18 +400,22 @@ ${formattedResults || '모든 항목이 정상입니다.'}
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1 }}>
                     <Tooltip title="전체 결과 복사 (에러/경고만)">
-                        <IconButton
-                            onClick={handleCopyAllResults}
-                            size="small"
-                            disabled={Object.keys(diagnosisResults).length === 0}
-                        >
-                            <ContentCopyIcon />
-                        </IconButton>
+                        <span>
+                            <IconButton
+                                onClick={handleCopyAllResults}
+                                size="small"
+                                disabled={Object.keys(diagnosisResults).length === 0}
+                            >
+                                <ContentCopyIcon />
+                            </IconButton>
+                        </span>
                     </Tooltip>
                     <Tooltip title="결과 초기화">
-                        <IconButton onClick={handleReset} size="small" disabled={isRunning}>
-                            <RefreshIcon />
-                        </IconButton>
+                        <span>
+                            <IconButton onClick={handleReset} size="small" disabled={isRunning}>
+                                <RefreshIcon />
+                            </IconButton>
+                        </span>
                     </Tooltip>
                 </Box>
             </Box>
@@ -551,17 +555,19 @@ ${formattedResults || '모든 항목이 정상입니다.'}
                                                                 sx={{ height: 20 }}
                                                             />
                                                             <Tooltip title="이 모드 전체 진단">
-                                                                <IconButton
-                                                                    size="small"
-                                                                    color="error"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleDiagnoseMode(modeKey);
-                                                                    }}
-                                                                    disabled={isRunning}
-                                                                >
-                                                                    <PlaylistPlayIcon fontSize="small" />
-                                                                </IconButton>
+                                                                <span>
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        color="error"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleDiagnoseMode(modeKey);
+                                                                        }}
+                                                                        disabled={isRunning}
+                                                                    >
+                                                                        <PlaylistPlayIcon fontSize="small" />
+                                                                    </IconButton>
+                                                                </span>
                                                             </Tooltip>
                                                         </>
                                                     )}
@@ -643,14 +649,16 @@ ${formattedResults || '모든 항목이 정상입니다.'}
                                                                             </>
                                                                         )}
                                                                         <Tooltip title="진단 실행">
-                                                                            <IconButton
-                                                                                size="small"
-                                                                                color="error"
-                                                                                onClick={() => handleDiagnoseTab(modeKey, tabKey, tabData)}
-                                                                                disabled={isRunning}
-                                                                            >
-                                                                                <PlayArrowIcon fontSize="small" />
-                                                                            </IconButton>
+                                                                            <span>
+                                                                                <IconButton
+                                                                                    size="small"
+                                                                                    color="error"
+                                                                                    onClick={() => handleDiagnoseTab(modeKey, tabKey, tabData)}
+                                                                                    disabled={isRunning}
+                                                                                >
+                                                                                    <PlayArrowIcon fontSize="small" />
+                                                                                </IconButton>
+                                                                            </span>
                                                                         </Tooltip>
                                                                     </Box>
                                                                 </ListItem>
