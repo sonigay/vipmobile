@@ -306,9 +306,35 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
 
               if (agentData && Array.isArray(agentData) && agentData.length > 0) {
 
-                // 비밀번호 관련 필드 제거 (보안)
+                // 중복 ID 처리를 위한 Set
+                const seenIds = new Set();
+
+                // 비밀번호 관련 필드 제거 (보안) 및 ID 중복 처리
                 const sanitizedAgents = agentData.map(agent => {
                   const { password, storedPassword, passwordNotUsed, hasPassword, isPasswordEmpty, ...safeAgent } = agent;
+
+                  // ID 중복 해결 로직
+                  if (safeAgent.contactId) {
+                    let uniqueId = safeAgent.contactId;
+                    // 이미 존재하는 ID라면 suffix 추가
+                    if (seenIds.has(uniqueId)) {
+                      const safeOffice = (safeAgent.office || '').replace(/\s+/g, '');
+                      const safeDept = (safeAgent.department || '').replace(/\s+/g, '');
+                      uniqueId = `${safeAgent.contactId}_${safeOffice}_${safeDept}`;
+
+                      // 변조된 ID도 중복이라면 카운터 추가
+                      let counter = 2;
+                      const baseUniqueId = uniqueId;
+                      while (seenIds.has(uniqueId)) {
+                        uniqueId = `${baseUniqueId}_${counter}`;
+                        counter++;
+                      }
+
+                      console.warn(`⚠️ [중복 ID 처리] ${safeAgent.contactId} -> ${uniqueId} (원본: ${agent.target})`);
+                    }
+                    safeAgent.contactId = uniqueId;
+                    seenIds.add(uniqueId);
+                  }
 
                   // department가 비밀번호나 체크박스 값인지 확인 (추가 보안 필터링)
                   if (safeAgent.department) {
@@ -1284,12 +1310,9 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
       let displayName = agent.target;
       // "이병각" 예외 처리: 이름 중복 방지를 위해 소속 정보 활용
       if (agent.target.includes('이병각')) {
-        // 소속이 이름과 같으면(예: "이병각"), 사무실 정보를 괄호로 추가 (예: "이병각(인천사무실)")
-        if (department === displayName && office) {
-          displayName = `${displayName}(${office})`;
-        }
         // 소속이 이름과 다르면(예: "이병각(강동)"), 소속을 이름으로 사용
-        else if (department) {
+        // (사무실 정보는 UI에 별도로 표시되므로 괄호로 추가하지 않음)
+        if (department && department !== displayName) {
           displayName = department;
         }
       }
@@ -3638,11 +3661,9 @@ function AssignmentSettingsScreen({ data, onBack, onLogout }) {
                                               // 미리보기에서는 getHierarchicalStructure에 접근하기 어려울 수 있으므로 로직 동일 적용
                                               let displayName = agent ? agent.target : agentId;
                                               if (agent && agent.target && agent.target.includes('이병각')) {
-                                                const office = agent.office || '';
                                                 const department = agent.department || '';
-                                                if (department === agent.target && office) {
-                                                  displayName = `${agent.target}(${office})`;
-                                                } else if (department) {
+                                                // 소속이 이름과 다르면 소속을 이름으로 사용
+                                                if (department && department !== agent.target) {
                                                   displayName = department;
                                                 }
                                               }
