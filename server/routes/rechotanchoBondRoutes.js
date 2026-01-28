@@ -32,8 +32,8 @@ function createRechotanchoBondRoutes(context) {
 
       // 시트 이름에 특수문자나 공백이 있을 수 있으므로 따옴표 처리 고려 (재초담초채권 -> '재초담초채권')
       // 하지만 Google Sheets API는 보통 그냥 처리함.
-      // range 포맷 확인
-      const range = `${sheetName}!A:Z`;
+      // range 포맷 확인 (사용자 피드백: 데이터는 G열까지 있음)
+      const range = `${sheetName}!A:G`;
       console.log(`[RechotanchoBond] Requesting range: ${range}`);
 
       const response = await rateLimiter.execute(() =>
