@@ -21,10 +21,20 @@ function createSubscriberIncreaseRoutes(context) {
     const response = await rateLimiter.execute(() =>
       sheetsClient.sheets.spreadsheets.values.get({
         spreadsheetId: sheetsClient.SPREADSHEET_ID,
-        range: `${sheetName}!A:Z`
+        range: `${sheetName}!A:AY` // AZ 대신 AY (51열) 정도면 충분
       })
     );
     return response.data.values || [];
+  }
+
+  // 인덱스를 엑셀 컬럼 이름으로 변환 (0 -> A, 26 -> AA)
+  function getColumnName(index) {
+    let columnName = '';
+    while (index >= 0) {
+      columnName = String.fromCharCode((index % 26) + 65) + columnName;
+      index = Math.floor(index / 26) - 1;
+    }
+    return columnName;
   }
 
   // GET /api/subscriber-increase/access - 접근 권한
@@ -101,8 +111,7 @@ function createSubscriberIncreaseRoutes(context) {
       const data = await getSheetValues(sheetName);
       if (data.length < 3) return;
 
-      const subscriberTotals = {};
-      const feeTotals = {};
+      console.log(`[SubscriberIncrease] 합계 재계산 시작: ColIndex=${yearMonthIndex}, Sheet=${sheetName}`);
 
       const getNum = (val) => {
         if (!val || val === '') return 0;
@@ -111,35 +120,42 @@ function createSubscriberIncreaseRoutes(context) {
         return parseFloat(cleaned) || 0;
       };
 
-      for (let i = 3; i < data.length; i++) {
-        const row = data[i];
-        const agentCode = row[0];
-        const type = row[2];
-        const value = getNum(row[yearMonthIndex]); // Use getNum helper
+      let subscriberTotal = 0;
+      let feeTotal = 0;
 
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        if (!row || row.length === 0) continue;
+
+        const agentCode = row[0]?.toString().trim();
+        const type = row[2]?.toString().trim();
+
+        // 합계 행(데이터 상단 2~3행)은 건너뜀
+        if (agentCode === '합계' || i < 3) continue;
+
+        const val = getNum(row[yearMonthIndex]);
         if (type === '가입자수') {
-          subscriberTotals[agentCode] = (subscriberTotals[agentCode] || 0) + value;
+          subscriberTotal += val;
         } else if (type === '관리수수료') {
-          feeTotals[agentCode] = (feeTotals[agentCode] || 0) + value;
+          feeTotal += val;
         }
       }
 
-      const totalSubscribers = Object.values(subscriberTotals).reduce((sum, val) => sum + val, 0);
-      const totalFees = Object.values(feeTotals).reduce((sum, val) => sum + val, 0);
+      console.log(`[SubscriberIncrease] 합계 산출 완료: 가입자수=${subscriberTotal}, 관리수수료=${feeTotal}`);
 
-      const updatedRow1 = [...data[1]];
-      const updatedRow2 = [...data[2]];
-      updatedRow1[yearMonthIndex] = totalSubscribers;
-      updatedRow2[yearMonthIndex] = totalFees;
+      // 시트의 2행, 3행에 합계 반영 (해당 컬럼만 업데이트)
+      const colName = getColumnName(yearMonthIndex);
+      const range = `${sheetName}!${colName}2:${colName}3`;
 
       await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.update({
           spreadsheetId,
-          range: `${sheetName}!A2:AA3`,
+          range: range,
           valueInputOption: 'RAW',
-          resource: { values: [updatedRow1, updatedRow2] }
+          resource: { values: [[subscriberTotal], [feeTotal]] }
         })
       );
+      console.log(`[SubscriberIncrease] 시트 합계 업데이트 완료: Range=${range}`);
     } catch (error) {
       console.error('Error calculating totals:', error);
     }
@@ -161,9 +177,9 @@ function createSubscriberIncreaseRoutes(context) {
       if (existingData.length === 0) return res.status(404).json({ success: false, error: '시트 데이터 없음' });
 
       const headers = existingData[0];
-      const yearMonthIndex = headers.findIndex(h => h === yearMonth);
+      const yearMonthIndex = headers.findIndex(h => h?.toString().trim() === yearMonth?.toString().trim());
       if (yearMonthIndex === -1) {
-        console.error(`[SubscriberIncrease] 헤더를 찾을 수 없음: ${yearMonth}. 헤더 목록:`, headers);
+        console.error(`[SubscriberIncrease] 헤더를 찾을 수 없음: ${yearMonth}. 헤더 목록:`, headers.slice(0, 10));
         return res.status(400).json({ success: false, error: '년월 컬럼을 찾을 수 없음' });
       }
 
@@ -185,12 +201,13 @@ function createSubscriberIncreaseRoutes(context) {
 
       console.log(`[SubscriberIncrease] 업데이트 실행: Row=${targetRowIndex + 1}, Col=${yearMonthIndex + 1}, Value=${value}`);
 
+      const colName = getColumnName(yearMonthIndex);
       await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.update({
           spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: `가입자증감!A${targetRowIndex + 1}:AA${targetRowIndex + 1}`,
+          range: `가입자증감!${colName}${targetRowIndex + 1}`,
           valueInputOption: 'RAW',
-          resource: { values: [updatedRow] }
+          resource: { values: [[value]] }
         })
       );
 
@@ -217,12 +234,17 @@ function createSubscriberIncreaseRoutes(context) {
 
       // 1. 기존 데이터 전체 로드
       const existingData = await getSheetValues('가입자증감');
-      if (existingData.length === 0) return res.status(404).json({ success: false, error: '시트 데이터를 찾을 수 없습니다.' });
+      if (existingData.length === 0) {
+        console.error('[SubscriberIncrease] 시트에서 데이터를 읽어오지 못했습니다.');
+        return res.status(404).json({ success: false, error: '시트 데이터를 찾을 수 없습니다.' });
+      }
 
       const headers = existingData[0];
-      const updatedData = [...existingData];
+      const updatedData = JSON.parse(JSON.stringify(existingData)); // Deep copy
       const affectedYearMonths = new Set();
       let successCount = 0;
+
+      console.log(`[SubscriberIncrease] 벌크 저장 시작: 항목 ${bulkData.length}개. 현재 시트 행 수: ${existingData.length}`);
 
       // 2. 인메모리 데이터 업데이트
       for (const item of bulkData) {
@@ -236,36 +258,56 @@ function createSubscriberIncreaseRoutes(context) {
 
         if (colIdx !== -1 && rowIdx !== -1) {
           // 열 수 부족 시 확장
-          while (updatedData[rowIdx].length <= colIdx) updatedData[rowIdx].push('');
+          while (updatedData[rowIdx].length <= colIdx) {
+            updatedData[rowIdx].push('');
+          }
+          const oldValue = updatedData[rowIdx][colIdx];
           updatedData[rowIdx][colIdx] = value;
           affectedYearMonths.add(colIdx);
           successCount++;
+          // console.log(`[SubscriberIncrease] 매칭 성공: [${rowIdx}, ${colIdx}] ${agentCode}/${type} -> ${value} (기존: ${oldValue})`);
         } else {
           console.warn(`[SubscriberIncrease] 매칭 실패: month="${yearMonth}" (ColIdx=${colIdx}), agent="${agentCode}", type="${type}" (RowIdx=${rowIdx})`);
-          if (colIdx === -1) {
-            console.log('[SubscriberIncrease] 사용 가능한 헤더 예시:', headers.slice(0, 5));
+          if (colIdx === -1 && successCount === 0) {
+            console.log('[SubscriberIncrease] 사용 가능한 헤더 예시:', headers.slice(0, 10));
           }
         }
       }
 
-      console.log(`[SubscriberIncrease] 업데이트 준비 완료: success=${successCount}/${bulkData.length}, affectedCols=${affectedYearMonths.size}`);
+      console.log(`[SubscriberIncrease] 메모리 업데이트 완료. 성공 항목: ${successCount}/${bulkData.length}. 수정될 열 인덱스:`, Array.from(affectedYearMonths));
+
+      if (successCount === 0) {
+        return res.json({
+          success: true,
+          results: { successCount: 0 },
+          total: bulkData.length,
+          message: '매칭된 데이터가 없어 업데이트가 수행되지 않았습니다.'
+        });
+      }
 
       // 3. 전체 시트 업데이트
-      if (successCount > 0) {
-        await rateLimiter.execute(() =>
-          sheetsClient.sheets.spreadsheets.values.update({
-            spreadsheetId: sheetsClient.SPREADSHEET_ID,
-            range: '가입자증감!A:AA',
-            valueInputOption: 'RAW',
-            resource: { values: updatedData }
-          })
-        );
+      // A1부터 마지막 행, 마지막 열까지 범위를 넉넉하게 지정
+      const range = `가입자증감!A1:AY${updatedData.length}`;
 
-        // 4. 영향받은 모든 월의 합계 재계산
-        for (const yearMonthIndex of affectedYearMonths) {
-          await calculateAndUpdateTotals(sheetsClient.SPREADSHEET_ID, '가입자증감', yearMonthIndex);
-        }
+      console.log(`[SubscriberIncrease] 시트 쓰기 시도: Range=${range}, 행수=${updatedData.length}`);
+
+      await rateLimiter.execute(() =>
+        sheetsClient.sheets.spreadsheets.values.update({
+          spreadsheetId: sheetsClient.SPREADSHEET_ID,
+          range: range,
+          valueInputOption: 'RAW',
+          resource: { values: updatedData }
+        })
+      );
+
+      console.log('[SubscriberIncrease] 시트 쓰기 완료. 합계 재계산 시작...');
+
+      // 4. 영향받은 모든 월의 합계 재계산
+      for (const yearMonthIndex of affectedYearMonths) {
+        await calculateAndUpdateTotals(sheetsClient.SPREADSHEET_ID, '가입자증감', yearMonthIndex);
       }
+
+      console.log('[SubscriberIncrease] 합계 재계산 완료. 캐시 삭제 중...');
 
       cacheManager.deletePattern('subscriber_increase');
       res.json({
@@ -285,29 +327,44 @@ function createSubscriberIncreaseRoutes(context) {
       if (!requireSheetsClient(res)) return;
       const { yearMonth, agentCode, type } = req.body;
 
+      console.log(`[SubscriberIncrease] 삭제 시작: month="${yearMonth}", agent="${agentCode}", type="${type}"`);
+
       const existingData = await getSheetValues('가입자증감');
+      if (existingData.length === 0) return res.status(404).json({ success: false, error: '시트 데이터를 찾을 수 없습니다.' });
+
       const headers = existingData[0];
-      const colIdx = headers.findIndex(h => h === yearMonth);
-      const rowIdx = existingData.findIndex((row, idx) => idx > 0 && row[0] === agentCode && row[2] === type);
+      const colIdx = headers.findIndex(h => h?.toString().trim() === yearMonth?.toString().trim());
+      const rowIdx = existingData.findIndex((row, idx) =>
+        idx > 0 &&
+        row[0]?.toString().trim() === agentCode?.toString().trim() &&
+        row[2]?.toString().trim() === type?.toString().trim()
+      );
 
       if (colIdx !== -1 && rowIdx !== -1) {
-        const updatedRow = [...existingData[rowIdx]];
-        updatedRow[colIdx] = '';
+        // 셀 주소 계산 (예: D5, AA5)
+        const colName = getColumnName(colIdx);
+        const cellRange = `가입자증감!${colName}${rowIdx + 1}`;
+
+        console.log(`[SubscriberIncrease] 셀 삭제(기초값) 시도: Range=${cellRange}`);
 
         await rateLimiter.execute(() =>
           sheetsClient.sheets.spreadsheets.values.update({
             spreadsheetId: sheetsClient.SPREADSHEET_ID,
-            range: `가입자증감!A${rowIdx + 1}:AA${rowIdx + 1}`,
+            range: cellRange,
             valueInputOption: 'RAW',
-            resource: { values: [updatedRow] }
+            resource: { values: [['']] }
           })
         );
         await calculateAndUpdateTotals(sheetsClient.SPREADSHEET_ID, '가입자증감', colIdx);
-      }
 
-      cacheManager.deletePattern('subscriber_increase');
-      res.json({ success: true });
+        cacheManager.deletePattern('subscriber_increase');
+        res.json({ success: true });
+      } else {
+        console.warn(`[SubscriberIncrease] 삭제 실패: 매칭되는 셀 없음 (RowIdx=${rowIdx}, ColIdx=${colIdx})`);
+        res.status(400).json({ success: false, error: '매칭되는 셀을 찾을 수 없습니다.' });
+      }
     } catch (error) {
+      console.error('[SubscriberIncrease] 삭제 에러:', error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -318,6 +375,7 @@ function createSubscriberIncreaseRoutes(context) {
       if (!requireSheetsClient(res)) return;
 
       const SUBSCRIBER_INCREASE_SHEET_NAME = '가입자증감';
+      console.log(`[SubscriberIncrease] 시트 초기화 시작: ${SUBSCRIBER_INCREASE_SHEET_NAME}`);
 
       // 시트 존재 여부 확인
       const spreadsheetResponse = await rateLimiter.execute(() =>
@@ -392,6 +450,7 @@ function createSubscriberIncreaseRoutes(context) {
       cacheManager.deletePattern('subscriber_increase');
       res.json({ success: true });
     } catch (error) {
+      console.error('[SubscriberIncrease] 시트 초기화 에러:', error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -401,15 +460,16 @@ function createSubscriberIncreaseRoutes(context) {
     try {
       if (!requireSheetsClient(res)) return;
 
+      console.log('[SubscriberIncrease] 제외 행 추가 요청');
       const existingData = await getSheetValues('가입자증감');
-      const hasExcludedRow = existingData.some(row => row[0] === '315835(제외)');
+      const hasExcludedRow = existingData.some(row => row[0]?.toString().trim() === '315835(제외)');
 
       if (hasExcludedRow) {
         return res.json({ success: true, message: '이미 존재함' });
       }
 
-      const updatedData = [...existingData];
-      const insertIndex = updatedData.findIndex(row => row[0] === '315835' && row[2] === '관리수수료') + 1;
+      const updatedData = JSON.parse(JSON.stringify(existingData));
+      const insertIndex = updatedData.findIndex(row => row[0]?.toString().trim() === '315835' && row[2]?.toString().trim() === '관리수수료') + 1;
 
       if (insertIndex > 0) {
         updatedData.splice(insertIndex, 0,
@@ -425,11 +485,15 @@ function createSubscriberIncreaseRoutes(context) {
             resource: { values: updatedData }
           })
         );
+        console.log('[SubscriberIncrease] 제외 행 추가 완료');
+      } else {
+        console.warn('[SubscriberIncrease] 제외 행 추가 실패: 315835 기준 행을 찾을 수 없음');
       }
 
       cacheManager.deletePattern('subscriber_increase');
       res.json({ success: true });
     } catch (error) {
+      console.error('[SubscriberIncrease] 제외 행 추가 에러:', error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
