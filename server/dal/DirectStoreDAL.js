@@ -40,7 +40,7 @@ class DirectStoreDAL {
     try {
       const filters = carrier ? { '통신사': carrier } : {};
       const data = await this.dal.read('direct_store_main_page_texts', filters);
-      
+
       return data.map(row => ({
         carrier: row['통신사'],
         category: row['카테고리'],
@@ -61,11 +61,11 @@ class DirectStoreDAL {
   async getPolicyMargin(carrier) {
     try {
       const data = await this.dal.read('direct_store_policy_margin', { '통신사': carrier });
-      
+
       if (data.length === 0) {
         return null;
       }
-      
+
       return {
         carrier: data[0]['통신사'],
         margin: parseInt(data[0]['마진']) || 0
@@ -82,7 +82,7 @@ class DirectStoreDAL {
   async getPolicyAddonServices(carrier) {
     try {
       const data = await this.dal.read('direct_store_policy_addon_services', { '통신사': carrier });
-      
+
       return data.map(row => ({
         carrier: row['통신사'],
         serviceName: row['서비스명'],
@@ -104,7 +104,7 @@ class DirectStoreDAL {
   async getPolicyInsurance(carrier) {
     try {
       const data = await this.dal.read('direct_store_policy_insurance', { '통신사': carrier });
-      
+
       return data.map(row => ({
         carrier: row['통신사'],
         productName: row['보험상품명'],
@@ -128,7 +128,7 @@ class DirectStoreDAL {
   async getPolicySpecial(carrier) {
     try {
       const data = await this.dal.read('direct_store_policy_special', { '통신사': carrier });
-      
+
       return data.map(row => {
         let conditionJson = null;
         try {
@@ -136,7 +136,7 @@ class DirectStoreDAL {
         } catch (e) {
           console.warn('[DirectStoreDAL] 조건JSON 파싱 실패:', row['조건JSON']);
         }
-        
+
         return {
           carrier: row['통신사'],
           policyName: row['정책명'],
@@ -161,9 +161,9 @@ class DirectStoreDAL {
       if (settingType) {
         filters['설정유형'] = settingType;
       }
-      
+
       const data = await this.dal.read('direct_store_settings', filters);
-      
+
       return data.map(row => {
         let settingsJson = null;
         try {
@@ -171,7 +171,7 @@ class DirectStoreDAL {
         } catch (e) {
           console.warn('[DirectStoreDAL] 설정값JSON 파싱 실패:', row['설정값JSON']);
         }
-        
+
         return {
           carrier: row['통신사'],
           settingType: row['설정유형'],
@@ -195,9 +195,9 @@ class DirectStoreDAL {
       if (planGroup) {
         filters['요금제군'] = planGroup;
       }
-      
+
       const data = await this.dal.read('direct_store_plan_master', filters);
-      
+
       return data.map(row => ({
         carrier: row['통신사'],
         planName: row['요금제명'],
@@ -235,7 +235,7 @@ class DirectStoreDAL {
         '사용여부': data.isActive ? 'Y' : 'N',
         '비고': data.note || ''
       };
-      
+
       await this.dal.create('direct_store_plan_master', record);
       console.log(`[DirectStoreDAL] 요금제 마스터 생성 완료: ${data.carrier} - ${data.planName}`);
       return { success: true };
@@ -255,25 +255,25 @@ class DirectStoreDAL {
     try {
       // 🔥 복합 키 사용: Supabase 직접 사용
       const { supabase } = require('../supabaseClient');
-      
+
       const record = {};
       if (updates.planGroup !== undefined) record['요금제군'] = updates.planGroup;
       if (updates.basicFee !== undefined) record['기본료'] = updates.basicFee;
       if (updates.planCode !== undefined) record['요금제코드'] = updates.planCode;
       if (updates.isActive !== undefined) record['사용여부'] = updates.isActive ? 'Y' : 'N';
       if (updates.note !== undefined) record['비고'] = updates.note;
-      
+
       const { data, error } = await supabase
         .from('direct_store_plan_master')
         .update(record)
         .eq('통신사', carrier)
         .eq('요금제명', planName)
         .select();
-      
+
       if (error) {
         throw new Error(`DB Update Error: ${error.message}`);
       }
-      
+
       console.log(`[DirectStoreDAL] 요금제 마스터 수정 완료: ${carrier} - ${planName}`);
       return { success: true };
     } catch (error) {
@@ -291,18 +291,18 @@ class DirectStoreDAL {
     try {
       // 🔥 복합 키 사용: Supabase 직접 사용
       const { supabase } = require('../supabaseClient');
-      
+
       const { data, error } = await supabase
         .from('direct_store_plan_master')
         .delete()
         .eq('통신사', carrier)
         .eq('요금제명', planName)
         .select();
-      
+
       if (error) {
         throw new Error(`DB Delete Error: ${error.message}`);
       }
-      
+
       console.log(`[DirectStoreDAL] 요금제 마스터 삭제 완료: ${carrier} - ${planName}`);
       return { success: true };
     } catch (error) {
@@ -320,9 +320,9 @@ class DirectStoreDAL {
       if (modelId) {
         filters['모델ID'] = modelId;
       }
-      
+
       const data = await this.dal.read('direct_store_device_master', filters);
-      
+
       return data.map(row => ({
         carrier: row['통신사'],
         modelId: row['모델ID'],
@@ -358,9 +358,9 @@ class DirectStoreDAL {
       if (modelId) {
         filters['모델ID'] = modelId;
       }
-      
+
       const data = await this.dal.read('direct_store_model_images', filters);
-      
+
       return data.map(row => ({
         id: row.id, // UUID 추가
         carrier: row['통신사'],
@@ -388,7 +388,7 @@ class DirectStoreDAL {
     try {
       const filters = carrier ? { '통신사': carrier } : {};
       const data = await this.dal.read('direct_store_todays_mobiles', filters);
-      
+
       return data.map(row => ({
         modelName: row['모델명'],
         petName: row['펫네임'],
@@ -424,9 +424,9 @@ class DirectStoreDAL {
       if (planGroup) {
         filters['요금제군'] = planGroup;
       }
-      
+
       const data = await this.dal.read('direct_store_device_pricing_policy', filters);
-      
+
       return data.map(row => ({
         carrier: row['통신사'],
         modelId: row['모델ID'],
@@ -464,7 +464,7 @@ class DirectStoreDAL {
         '경도': data.longitude,
         '수정일시': new Date().toISOString()
       };
-      
+
       await this.dal.create('direct_store_transit_locations', record);
       return { success: true, id: data.id };
     } catch (error) {
@@ -481,13 +481,13 @@ class DirectStoreDAL {
       const updates = {
         '수정일시': new Date().toISOString()
       };
-      
+
       if (data.type) updates['타입'] = data.type;
       if (data.name) updates['이름'] = data.name;
       if (data.address) updates['주소'] = data.address;
       if (data.latitude !== undefined) updates['위도'] = data.latitude;
       if (data.longitude !== undefined) updates['경도'] = data.longitude;
-      
+
       await this.dal.update('direct_store_transit_locations', { id }, updates);
       return { success: true };
     } catch (error) {
@@ -518,10 +518,10 @@ class DirectStoreDAL {
         '모델명': modelName,
         '통신사': carrier
       };
-      
+
       // 기존 데이터 확인
       const existing = await this.dal.read('direct_store_todays_mobiles', filters);
-      
+
       const updates = {
         '인기': tags.isPopular ? 'Y' : 'N',
         '추천': tags.isRecommended ? 'Y' : 'N',
@@ -529,7 +529,7 @@ class DirectStoreDAL {
         '프리미엄': tags.isPremium ? 'Y' : 'N',
         '중저가': tags.isBudget ? 'Y' : 'N'
       };
-      
+
       if (existing.length > 0) {
         // 업데이트
         await this.dal.update('direct_store_todays_mobiles', filters, updates);
@@ -550,7 +550,7 @@ class DirectStoreDAL {
         };
         await this.dal.create('direct_store_todays_mobiles', record);
       }
-      
+
       return { success: true };
     } catch (error) {
       console.error('[DirectStoreDAL] 오늘의 휴대폰 태그 업데이트 실패:', error);
@@ -591,7 +591,7 @@ class DirectStoreDAL {
         '표시여부': mobileData.isActive !== false,
         '등록일시': new Date().toISOString()
       };
-      
+
       await this.dal.create('direct_store_todays_mobiles', record);
       return { success: true };
     } catch (error) {
@@ -606,18 +606,18 @@ class DirectStoreDAL {
   async updateDeviceMasterTags(modelId, carrier, tags) {
     try {
       const updates = {};
-      
+
       if (tags.isPremium !== undefined) updates['isPremium'] = tags.isPremium ? 'Y' : 'N';
       if (tags.isBudget !== undefined) updates['isBudget'] = tags.isBudget ? 'Y' : 'N';
       if (tags.isPopular !== undefined) updates['isPopular'] = tags.isPopular ? 'Y' : 'N';
       if (tags.isRecommended !== undefined) updates['isRecommended'] = tags.isRecommended ? 'Y' : 'N';
       if (tags.isCheap !== undefined) updates['isCheap'] = tags.isCheap ? 'Y' : 'N';
-      
+
       await this.dal.update('direct_store_device_master', {
         '모델ID': modelId,
         '통신사': carrier
       }, updates);
-      
+
       return { success: true };
     } catch (error) {
       console.error('[DirectStoreDAL] 단말 마스터 태그 업데이트 실패:', error);
@@ -658,7 +658,7 @@ class DirectStoreDAL {
         '비고': data.note || '',
         '등록일시': new Date().toISOString()
       };
-      
+
       await this.dal.create('direct_store_sales_daily', record);
       return { success: true, id: record['번호'] };
     } catch (error) {
@@ -677,22 +677,22 @@ class DirectStoreDAL {
         '카테고리': category || '',
         '설정유형': type
       };
-      
+
       const updates = {
         '문구내용': data.content || '',
         '이미지URL': data.imageUrl || '',
         '수정일시': new Date().toISOString()
       };
-      
+
       // 기존 데이터 확인
       const existing = await this.dal.read('direct_store_main_page_texts', filters);
-      
+
       if (existing.length > 0) {
         await this.dal.update('direct_store_main_page_texts', filters, updates);
       } else {
         await this.dal.create('direct_store_main_page_texts', { ...filters, ...updates });
       }
-      
+
       return { success: true };
     } catch (error) {
       console.error('[DirectStoreDAL] 메인 페이지 문구 업데이트 실패:', error);
@@ -706,12 +706,12 @@ class DirectStoreDAL {
   async updateStorePhoto(storeName, photoType, data) {
     try {
       const filters = { '업체명': storeName };
-      
+
       // 기존 데이터 확인
       const existing = await this.dal.read('direct_store_photos', filters);
-      
+
       const updates = {};
-      
+
       // photoType에 따라 업데이트할 필드 결정
       if (photoType === 'front') {
         updates['전면사진URL'] = data.url || '';
@@ -729,13 +729,13 @@ class DirectStoreDAL {
         updates['외부사진Discord포스트ID'] = data.discordPostId || '';
         updates['외부사진Discord스레드ID'] = data.discordThreadId || '';
       }
-      
+
       if (existing.length > 0) {
         await this.dal.update('direct_store_photos', filters, updates);
       } else {
         await this.dal.create('direct_store_photos', { ...filters, ...updates });
       }
-      
+
       return { success: true };
     } catch (error) {
       console.error('[DirectStoreDAL] 매장 사진 업데이트 실패:', error);
@@ -749,7 +749,7 @@ class DirectStoreDAL {
   async getStoreTransitLocations(storeName) {
     try {
       const data = await this.dal.read('direct_store_photos', { '업체명': storeName });
-      
+
       if (data.length === 0) {
         return {
           storeName,
@@ -757,23 +757,23 @@ class DirectStoreDAL {
           subwayStationIds: []
         };
       }
-      
+
       const row = data[0];
       let busTerminalIds = [];
       let subwayStationIds = [];
-      
+
       try {
         busTerminalIds = row['버스터미널ID목록'] ? JSON.parse(row['버스터미널ID목록']) : [];
       } catch (e) {
         console.warn('[DirectStoreDAL] 버스터미널ID목록 파싱 실패:', row['버스터미널ID목록']);
       }
-      
+
       try {
         subwayStationIds = row['지하철역ID목록'] ? JSON.parse(row['지하철역ID목록']) : [];
       } catch (e) {
         console.warn('[DirectStoreDAL] 지하철역ID목록 파싱 실패:', row['지하철역ID목록']);
       }
-      
+
       return {
         storeName,
         busTerminalIds: Array.isArray(busTerminalIds) ? busTerminalIds : [],
@@ -791,22 +791,22 @@ class DirectStoreDAL {
   async updateStoreTransitLocations(storeName, busTerminalIds, subwayStationIds) {
     try {
       const filters = { '업체명': storeName };
-      
+
       // 기존 데이터 확인
       const existing = await this.dal.read('direct_store_photos', filters);
-      
+
       const updates = {
         '버스터미널ID목록': JSON.stringify(Array.isArray(busTerminalIds) ? busTerminalIds : []),
         '지하철역ID목록': JSON.stringify(Array.isArray(subwayStationIds) ? subwayStationIds : []),
         '수정일시': new Date().toISOString()
       };
-      
+
       if (existing.length > 0) {
         await this.dal.update('direct_store_photos', filters, updates);
       } else {
         await this.dal.create('direct_store_photos', { ...filters, ...updates });
       }
-      
+
       return { success: true };
     } catch (error) {
       console.error('[DirectStoreDAL] 매장별 대중교통 위치 업데이트 실패:', error);
@@ -820,20 +820,20 @@ class DirectStoreDAL {
   async updatePolicyMargin(carrier, margin) {
     try {
       const filters = { '통신사': carrier };
-      
+
       // 기존 데이터 확인
       const existing = await this.dal.read('direct_store_policy_margin', filters);
-      
+
       const updates = {
         '마진': margin
       };
-      
+
       if (existing.length > 0) {
         await this.dal.update('direct_store_policy_margin', filters, updates);
       } else {
         await this.dal.create('direct_store_policy_margin', { ...filters, ...updates });
       }
-      
+
       return { success: true };
     } catch (error) {
       console.error('[DirectStoreDAL] 정책 마진 업데이트 실패:', error);
@@ -848,7 +848,7 @@ class DirectStoreDAL {
     try {
       // 1. 기존 데이터 삭제
       await this.dal.delete('direct_store_policy_addon_services', { '통신사': carrier });
-      
+
       // 2. 새 데이터 삽입
       for (const service of services) {
         const record = {
@@ -860,10 +860,10 @@ class DirectStoreDAL {
           '상세설명': service.description || '',
           '공식사이트URL': service.officialUrl || ''
         };
-        
+
         await this.dal.create('direct_store_policy_addon_services', record);
       }
-      
+
       return { success: true };
     } catch (error) {
       console.error('[DirectStoreDAL] 부가서비스 정책 업데이트 실패:', error);
@@ -878,7 +878,7 @@ class DirectStoreDAL {
     try {
       // 1. 기존 데이터 삭제
       await this.dal.delete('direct_store_policy_insurance', { '통신사': carrier });
-      
+
       // 2. 새 데이터 삽입
       for (const insurance of insurances) {
         const record = {
@@ -892,10 +892,10 @@ class DirectStoreDAL {
           '상세설명': insurance.description || '',
           '공식사이트URL': insurance.officialUrl || ''
         };
-        
+
         await this.dal.create('direct_store_policy_insurance', record);
       }
-      
+
       return { success: true };
     } catch (error) {
       console.error('[DirectStoreDAL] 보험상품 정책 업데이트 실패:', error);
@@ -910,7 +910,7 @@ class DirectStoreDAL {
     try {
       // 1. 기존 데이터 삭제
       await this.dal.delete('direct_store_policy_special', { '통신사': carrier });
-      
+
       // 2. 새 데이터 삽입
       for (const policy of policies) {
         const record = {
@@ -921,10 +921,10 @@ class DirectStoreDAL {
           '적용여부': policy.isActive ? 'TRUE' : 'FALSE',
           '조건JSON': policy.condition ? JSON.stringify(policy.condition) : ''
         };
-        
+
         await this.dal.create('direct_store_policy_special', record);
       }
-      
+
       return { success: true };
     } catch (error) {
       console.error('[DirectStoreDAL] 특별 정책 업데이트 실패:', error);
@@ -941,22 +941,22 @@ class DirectStoreDAL {
         '통신사': carrier,
         '설정유형': settingType
       };
-      
+
       // 기존 데이터 확인
       const existing = await this.dal.read('direct_store_settings', filters);
-      
+
       const updates = {
         '시트ID': settings.sheetId || '',
         '시트URL': settings.sheetUrl || '',
         '설정값JSON': settings.settings ? JSON.stringify(settings.settings) : ''
       };
-      
+
       if (existing.length > 0) {
         await this.dal.update('direct_store_settings', filters, updates);
       } else {
         await this.dal.create('direct_store_settings', { ...filters, ...updates });
       }
-      
+
       return { success: true };
     } catch (error) {
       console.error('[DirectStoreDAL] 설정 업데이트 실패:', error);
@@ -974,7 +974,7 @@ class DirectStoreDAL {
         '통신사': carrier,
         '모델ID': modelId
       });
-      
+
       // 2. 새 이미지 삽입
       for (const image of images) {
         const record = {
@@ -990,10 +990,10 @@ class DirectStoreDAL {
           'Discord포스트ID': image.discordPostId || '',
           'Discord스레드ID': image.discordThreadId || ''
         };
-        
+
         await this.dal.create('direct_store_model_images', record);
       }
-      
+
       return { success: true };
     } catch (error) {
       console.error('[DirectStoreDAL] 모델 이미지 업데이트 실패:', error);
@@ -1011,10 +1011,10 @@ class DirectStoreDAL {
       const updates = {
         '이미지URL': imageUrl
       };
-      
+
       // 🔥 수정: id를 직접 전달 (객체가 아닌 문자열)
       await this.dal.update('direct_store_model_images', id, updates);
-      
+
       return { success: true };
     } catch (error) {
       console.error('[DirectStoreDAL] 모델 이미지 URL 업데이트 실패:', error);
@@ -1038,21 +1038,20 @@ class DirectStoreDAL {
       await this.dal.deleteAll('direct_store_plan_master');
 
       // 2. 새 데이터 삽입
-      let insertedCount = 0;
-      for (const plan of planData) {
-        const record = {
-          '통신사': plan.carrier,
-          '요금제명': plan.planName,
-          '요금제군': plan.planGroup,
-          '기본료': plan.basicFee || 0,
-          '요금제코드': plan.planCode || '',
-          '사용여부': plan.isActive ? 'Y' : 'N',
-          '비고': plan.note || ''
-        };
-        
-        await this.dal.create('direct_store_plan_master', record);
-        insertedCount++;
-      }
+      const records = planData.map(plan => ({
+        '통신사': plan.carrier,
+        '요금제명': plan.planName,
+        '요금제군': plan.planGroup,
+        '기본료': plan.basicFee || 0,
+        '요금제코드': plan.planCode || '',
+        '사용여부': plan.isActive ? 'Y' : 'N',
+        '비고': plan.note || ''
+      }));
+
+      // 배치 생성 (DirectStoreDAL은 DALFactory를 통해 생성된 DataAccessLayer 인스턴스를 사용하므로 batchCreate 호출 가능)
+      // DataAccessLayer.batchCreate -> Implementation.batchCreate
+      await this.dal.batchCreate('direct_store_plan_master', records);
+      const insertedCount = records.length;
 
       const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
       console.log(`✅ [DirectStoreDAL.rebuildPlanMaster] 요금제 마스터 재빌드 완료 - ${new Date().toISOString()}`, {
@@ -1081,32 +1080,29 @@ class DirectStoreDAL {
       await this.dal.deleteAll('direct_store_device_master');
 
       // 2. 새 데이터 삽입
-      let insertedCount = 0;
-      for (const device of deviceData) {
-        const record = {
-          '통신사': device.carrier,
-          '모델ID': device.modelId,
-          '모델명': device.modelName,
-          '펫네임': device.petName || '',
-          '제조사': device.manufacturer || '',
-          '출고가': device.factoryPrice || 0,
-          '기본요금제군': device.defaultPlanGroup || '',
-          'isPremium': device.isPremium ? 'Y' : 'N',
-          'isBudget': device.isBudget ? 'Y' : 'N',
-          'isPopular': device.isPopular ? 'Y' : 'N',
-          'isRecommended': device.isRecommended ? 'Y' : 'N',
-          'isCheap': device.isCheap ? 'Y' : 'N',
-          '이미지URL': device.imageUrl || '',
-          '사용여부': device.isActive ? 'Y' : 'N',
-          '비고': device.note || '',
-          'Discord메시지ID': device.discordMessageId || '',
-          'Discord포스트ID': device.discordPostId || '',
-          'Discord스레드ID': device.discordThreadId || ''
-        };
-        
-        await this.dal.create('direct_store_device_master', record);
-        insertedCount++;
-      }
+      const records = deviceData.map(device => ({
+        '통신사': device.carrier,
+        '모델ID': device.modelId,
+        '모델명': device.modelName,
+        '펫네임': device.petName || '',
+        '제조사': device.manufacturer || '',
+        '출고가': device.factoryPrice || 0,
+        '기본요금제군': device.defaultPlanGroup || '',
+        'isPremium': device.isPremium ? 'Y' : 'N',
+        'isBudget': device.isBudget ? 'Y' : 'N',
+        'isPopular': device.isPopular ? 'Y' : 'N',
+        'isRecommended': device.isRecommended ? 'Y' : 'N',
+        'isCheap': device.isCheap ? 'Y' : 'N',
+        '이미지URL': device.imageUrl || '',
+        '사용여부': device.isActive ? 'Y' : 'N',
+        '비고': device.note || '',
+        'Discord메시지ID': device.discordMessageId || '',
+        'Discord포스트ID': device.discordPostId || '',
+        'Discord스레드ID': device.discordThreadId || ''
+      }));
+
+      await this.dal.batchCreate('direct_store_device_master', records);
+      const insertedCount = records.length;
 
       const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
       console.log(`✅ [DirectStoreDAL.rebuildDeviceMaster] 단말 마스터 재빌드 완료 - ${new Date().toISOString()}`, {
@@ -1135,27 +1131,24 @@ class DirectStoreDAL {
       await this.dal.deleteAll('direct_store_device_pricing_policy');
 
       // 2. 새 데이터 삽입
-      let insertedCount = 0;
-      for (const pricing of pricingData) {
-        const record = {
-          '통신사': pricing.carrier,
-          '모델ID': pricing.modelId,
-          '모델명': pricing.modelName,
-          '요금제군': pricing.planGroup,
-          '요금제코드': pricing.planCode || '',
-          '개통유형': pricing.openingType,
-          '출고가': pricing.factoryPrice || 0,
-          '이통사지원금': pricing.publicSupport || 0,
-          '대리점추가지원금_부가유치': pricing.storeAdditionalSupportWithAddon || 0,
-          '정책마진': pricing.policyMargin || 0,
-          '정책ID': pricing.policyId || '',
-          '기준일자': pricing.baseDate || '',
-          '비고': pricing.note || ''
-        };
-        
-        await this.dal.create('direct_store_device_pricing_policy', record);
-        insertedCount++;
-      }
+      const records = pricingData.map(pricing => ({
+        '통신사': pricing.carrier,
+        '모델ID': pricing.modelId,
+        '모델명': pricing.modelName,
+        '요금제군': pricing.planGroup,
+        '요금제코드': pricing.planCode || '',
+        '개통유형': pricing.openingType,
+        '출고가': pricing.factoryPrice || 0,
+        '이통사지원금': pricing.publicSupport || 0,
+        '대리점추가지원금_부가유치': pricing.storeAdditionalSupportWithAddon || 0,
+        '정책마진': pricing.policyMargin || 0,
+        '정책ID': pricing.policyId || '',
+        '기준일자': pricing.baseDate || '',
+        '비고': pricing.note || ''
+      }));
+
+      await this.dal.batchCreate('direct_store_device_pricing_policy', records);
+      const insertedCount = records.length;
 
       const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
       console.log(`✅ [DirectStoreDAL.rebuildPricingMaster] 단말 요금정책 재빌드 완료 - ${new Date().toISOString()}`, {
@@ -1316,7 +1309,7 @@ class DirectStoreDAL {
         'Discord포스트ID': data.discordPostId || '',
         'Discord스레드ID': data.discordThreadId || ''
       };
-      
+
       await this.dal.create('direct_store_device_master', record);
       console.log(`[DirectStoreDAL] 단말 마스터 생성 완료: ${data.carrier} - ${data.modelId}`);
       return { success: true };
@@ -1336,7 +1329,7 @@ class DirectStoreDAL {
   async updateDeviceMaster(carrier, modelId, updates) {
     try {
       const record = {};
-      
+
       // 수정 가능한 필드만 매핑
       if (updates.modelName !== undefined) record['모델명'] = updates.modelName;
       if (updates.petName !== undefined) record['펫네임'] = updates.petName;
@@ -1354,7 +1347,7 @@ class DirectStoreDAL {
       if (updates.discordMessageId !== undefined) record['Discord메시지ID'] = updates.discordMessageId;
       if (updates.discordPostId !== undefined) record['Discord포스트ID'] = updates.discordPostId;
       if (updates.discordThreadId !== undefined) record['Discord스레드ID'] = updates.discordThreadId;
-      
+
       // Supabase 직접 사용 (복합 키 지원)
       const { data, error } = await supabase
         .from('direct_store_device_master')
@@ -1362,11 +1355,11 @@ class DirectStoreDAL {
         .eq('통신사', carrier)
         .eq('모델ID', modelId)
         .select();
-      
+
       if (error) {
         throw new Error(`DB Update Error: ${error.message}`);
       }
-      
+
       console.log(`[DirectStoreDAL] 단말 마스터 수정 완료: ${carrier} - ${modelId}`);
       return { success: true };
     } catch (error) {
@@ -1390,11 +1383,11 @@ class DirectStoreDAL {
         .eq('통신사', carrier)
         .eq('모델ID', modelId)
         .select();
-      
+
       if (error) {
         throw new Error(`DB Delete Error: ${error.message}`);
       }
-      
+
       console.log(`[DirectStoreDAL] 단말 마스터 삭제 완료: ${carrier} - ${modelId}`);
       return { success: true };
     } catch (error) {
@@ -1440,7 +1433,7 @@ class DirectStoreDAL {
         '기준일자': data.baseDate || new Date().toISOString().split('T')[0],
         '비고': data.note || ''
       };
-      
+
       await this.dal.create('direct_store_device_pricing_policy', record);
       console.log(`[DirectStoreDAL] 단말 요금정책 생성 완료: ${data.carrier} - ${data.modelId} - ${data.planGroup} - ${data.openingType}`);
       return { success: true };
@@ -1462,7 +1455,7 @@ class DirectStoreDAL {
   async updatePricingMaster(carrier, modelId, planGroup, openingType, updates) {
     try {
       const record = {};
-      
+
       // 수정 가능한 필드만 매핑
       if (updates.modelName !== undefined) record['모델명'] = updates.modelName;
       if (updates.planCode !== undefined) record['요금제코드'] = updates.planCode;
@@ -1473,7 +1466,7 @@ class DirectStoreDAL {
       if (updates.policyId !== undefined) record['정책ID'] = updates.policyId;
       if (updates.baseDate !== undefined) record['기준일자'] = updates.baseDate;
       if (updates.note !== undefined) record['비고'] = updates.note;
-      
+
       // Supabase 직접 사용 (복합 키 지원)
       const { data, error } = await supabase
         .from('direct_store_device_pricing_policy')
@@ -1483,11 +1476,11 @@ class DirectStoreDAL {
         .eq('요금제군', planGroup)
         .eq('개통유형', openingType)
         .select();
-      
+
       if (error) {
         throw new Error(`DB Update Error: ${error.message}`);
       }
-      
+
       console.log(`[DirectStoreDAL] 단말 요금정책 수정 완료: ${carrier} - ${modelId} - ${planGroup} - ${openingType}`);
       return { success: true };
     } catch (error) {
@@ -1515,11 +1508,11 @@ class DirectStoreDAL {
         .eq('요금제군', planGroup)
         .eq('개통유형', openingType)
         .select();
-      
+
       if (error) {
         throw new Error(`DB Delete Error: ${error.message}`);
       }
-      
+
       console.log(`[DirectStoreDAL] 단말 요금정책 삭제 완료: ${carrier} - ${modelId} - ${planGroup} - ${openingType}`);
       return { success: true };
     } catch (error) {

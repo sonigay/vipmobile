@@ -19,7 +19,7 @@ export async function refreshDiscordImageUrl(threadId, messageId) {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}/api/discord/refresh-image-url?threadId=${threadId}&messageId=${messageId}`
+      `${API_BASE_URL}/api/discord/refresh-image-url?threadId=${threadId}&messageId=${messageId}&t=${Date.now()}`
     );
 
     if (!response.ok) {
@@ -62,35 +62,35 @@ export function loadImageWithRefresh(imageUrl, threadId = null, messageId = null
 
     // Discord URL이고 메시지 ID가 있으면 자동 갱신 시도
     const img = new Image();
-    
+
     // 1차 시도: 저장된 URL 사용
     img.src = imageUrl;
-    
+
     img.onload = () => {
       resolve(img.src);
     };
-    
+
     img.onerror = async () => {
       // URL 만료 감지 → 갱신 시도 (개발 환경에서만 로그)
       if (process.env.NODE_ENV === 'development') {
         console.log('⚠️ [Discord 이미지] URL 만료 감지, 갱신 시도:', { threadId, messageId });
       }
-      
+
       try {
         const refreshResult = await refreshDiscordImageUrl(threadId, messageId);
-        
+
         if (refreshResult.success && refreshResult.imageUrl) {
           // 2차 시도: 갱신된 URL 사용 (개발 환경에서만 로그)
           if (process.env.NODE_ENV === 'development') {
             console.log('✅ [Discord 이미지] URL 갱신 성공, 재시도:', refreshResult.imageUrl.substring(0, 100));
           }
-          
+
           if (onRefresh) {
             onRefresh(refreshResult.imageUrl);
           }
-          
+
           img.src = refreshResult.imageUrl;
-          
+
           img.onload = () => resolve(img.src);
           img.onerror = () => reject(new Error('갱신된 URL로도 이미지 로드 실패'));
         } else {
@@ -159,7 +159,7 @@ export function attachDiscordImageRefreshHandler(imgElement, threadId, messageId
 
   const originalSrc = imgElement.src;
   const isDiscordUrl = originalSrc.includes('cdn.discordapp.com') || originalSrc.includes('media.discordapp.net');
-  
+
   if (!isDiscordUrl) {
     return; // Discord URL이 아니면 처리하지 않음
   }
@@ -169,20 +169,20 @@ export function attachDiscordImageRefreshHandler(imgElement, threadId, messageId
     if (process.env.NODE_ENV === 'development') {
       console.log('⚠️ [Discord 이미지] 로드 실패, 갱신 시도:', { threadId, messageId });
     }
-    
+
     try {
       const refreshResult = await refreshDiscordImageUrl(threadId, messageId);
-      
+
       if (refreshResult.success && refreshResult.imageUrl) {
         // 개발 환경에서만 로그 출력
         if (process.env.NODE_ENV === 'development') {
           console.log('✅ [Discord 이미지] URL 갱신 성공');
         }
-        
+
         if (onRefresh) {
           onRefresh(refreshResult.imageUrl);
         }
-        
+
         imgElement.src = refreshResult.imageUrl;
         imgElement.onerror = null; // 무한 루프 방지
       } else {

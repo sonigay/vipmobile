@@ -6,14 +6,15 @@
 module.exports = function createDiscordRoutes(context) {
   const express = require('express');
   const router = express.Router();
-  
+
   const { discordBot } = context;
 
   // Discord 이미지 URL 갱신 API
   router.get('/discord/refresh-image-url', async (req, res) => {
+    res.set('Cache-Control', 'no-store'); // 캐시 방지
     try {
       const { threadId, messageId } = req.query;
-      
+
       if (!threadId || !messageId) {
         return res.status(400).json({ error: 'threadId와 messageId가 필요합니다.' });
       }
@@ -35,13 +36,13 @@ module.exports = function createDiscordRoutes(context) {
 
       // 첨부 파일에서 이미지 URL 추출
       const imageUrl = message.attachments.first()?.url || null;
-      
+
       if (!imageUrl) {
         return res.status(404).json({ error: '이미지를 찾을 수 없습니다.' });
       }
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         imageUrl,
         threadId,
         messageId

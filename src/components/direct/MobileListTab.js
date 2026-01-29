@@ -240,10 +240,10 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
         initializedRef.current = true;
       } catch (err) {
         console.error('❌ [휴대폰시세표] 데이터 로딩 실패:', err);
-        
+
         // 🔥 사용자 친화적인 에러 메시지 생성
         let userMessage = '데이터를 불러오는 중 오류가 발생했습니다.';
-        
+
         if (err.message) {
           if (err.message.includes('SHEET_ID')) {
             userMessage = '서버 설정 오류: Google Sheets ID가 올바르지 않습니다. 관리자에게 문의하세요.';
@@ -261,7 +261,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
             userMessage = `데이터 로딩 실패: ${err.message}`;
           }
         }
-        
+
         setError(userMessage);
         setSteps(prev => ({
           ...prev,
@@ -294,19 +294,19 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
   const handleReload = async () => {
     try {
       setLoading(true);
-      
+
       // 현재 선택된 통신사의 마스터 데이터 재빌드
       const carrier = getCurrentCarrier();
       const result = await directStoreApiClient.rebuildMaster(carrier);
-      
+
       if (result.success) {
         // 해당 통신사의 프론트엔드 캐시 무효화
         directStoreApiClient.clearCacheByCarrier(carrier);
-        
+
         // 데이터 재로드 (reloadTrigger 증가)
         setReloadTrigger(prev => prev + 1);
         initializedRef.current = false;
-        
+
         // 성공 메시지 표시
         alert(`${carrier} 시세표 갱신 완료!\n단말: ${result.deviceCount}개, 요금제: ${result.planCount}개`);
       } else {
@@ -332,17 +332,17 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
 
       // 통신사별 이미지 갱신 API 호출
       const result = await directStoreApiClient.refreshImagesFromDiscord(carrier);
-      
+
       if (result.success) {
         // 해당 통신사의 이미지 캐시 무효화
         directStoreApiClient.clearImageCache(carrier);
-        
+
         // 데이터 재로드
         setReloadTrigger(prev => prev + 1);
-        
+
         // 성공 메시지 표시
         alert(`${carrier} 이미지 갱신 완료!\n성공: ${result.updatedCount}개, 실패: ${result.failedCount}개`);
-        
+
         // 실패한 이미지가 있으면 상세 정보 표시
         if (result.failedCount > 0 && result.failedImages) {
           const failedList = result.failedImages.map(f => `${f.modelId}: ${f.reason}`).join('\n');
@@ -395,7 +395,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
   const lookupPrice = useCallback((modelId, planGroup, openingType) => {
     // 🔥 수정: 시트 데이터 로드 시 이미 '010신규/기변'을 '010신규'와 '기변'에 매핑했으므로
     // lookupPrice에서는 원래 openingType 그대로 조회하면 됨
-    const key = `${modelId}-${planGroup}-${openingType}`;
+    const key = `${modelId.toUpperCase()}-${planGroup}-${openingType}`;
     const priceData = pricingDataRef.current.get(key);
 
     // 현재 단말 정보 찾기

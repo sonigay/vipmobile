@@ -583,67 +583,41 @@ const MAX_REBUILD_DURATION_MS = 30 * 60 * 1000; // 30분 최대 실행 시간
 
 // 데이터 재빌드 함수
 async function rebuildMasterData() {
+  const directRoutes = require('./directRoutes');
+  const executeFullRebuild = directRoutes.executeFullRebuild;
+  const getIsRebuilding = directRoutes.getIsRebuilding;
+
   // 이미 재빌드가 진행 중이면 건너뛰기
-  if (isRebuilding) {
-    const elapsed = rebuildStartTime ? Date.now() - rebuildStartTime : 0;
-    if (elapsed > MAX_REBUILD_DURATION_MS) {
-      console.warn('⚠️ [스케줄러] 재빌드가 최대 실행 시간을 초과했습니다. 강제 종료합니다.');
-      isRebuilding = false;
-      rebuildStartTime = null;
-    } else {
-      console.log(`⚠️ [스케줄러] 이미 재빌드가 진행 중입니다. (경과 시간: ${Math.floor(elapsed / 1000)}초) 건너뜁니다.`);
-      return;
-    }
+  if (getIsRebuilding && getIsRebuilding()) {
+    console.log(`⚠️ [스케줄러] 이미 재빌드가 진행 중입니다. 건너뜁니다.`);
+    return;
   }
 
-  isRebuilding = true;
-  rebuildStartTime = Date.now();
   const startTime = Date.now();
 
   try {
     console.log('🔄 [스케줄러] 데이터 재빌드 시작...');
 
-    const { rebuildPlanMaster, rebuildDeviceMaster, rebuildPricingMaster } = require('./directRoutes');
-    const carriers = ['SK', 'KT', 'LG'];
+    if (executeFullRebuild) {
+      // centralized executeFullRebuild 사용 (락 관리 및 단계별 지연 내장)
+      const results = await retryWithBackoff(
+        () => executeFullRebuild(['SK', 'KT', 'LG']),
+        2, // 내부적으로도 안정이 되었으므로 재시도 횟수 조정 가능
+        5000
+      );
 
-    // 1. 요금제 마스터 리빌드 (재시도 포함)
-    console.log(`[스케줄러] Rebuilding Plan Master for ${carriers.join(',')}`);
-    const planResult = await retryWithBackoff(
-      () => rebuildPlanMaster(carriers),
-      3,
-      2000
-    );
-    console.log(`[스케줄러] Plan Master 완료: ${planResult?.totalCount || 0}개`);
-
-    // 2. 단말 마스터 리빌드 (재시도 포함)
-    console.log(`[스케줄러] Rebuilding Device Master for ${carriers.join(',')}`);
-    const deviceResult = await retryWithBackoff(
-      () => rebuildDeviceMaster(carriers),
-      3,
-      2000
-    );
-    console.log(`[스케줄러] Device Master 완료: ${deviceResult?.totalCount || 0}개`);
-
-    // 3. 단말 요금정책 리빌드 (재시도 포함)
-    console.log(`[스케줄러] Rebuilding Pricing Master for ${carriers.join(',')}`);
-    const pricingResult = await retryWithBackoff(
-      () => rebuildPricingMaster(carriers),
-      3,
-      2000
-    );
-    console.log(`[스케줄러] Pricing Master 완료: ${pricingResult?.totalCount || 0}개`);
-
-    const elapsed = Date.now() - startTime;
-    console.log(`✅ [스케줄러] 데이터 재빌드 완료 (소요 시간: ${Math.floor(elapsed / 1000)}초)`);
+      const elapsed = Date.now() - startTime;
+      console.log(`✅ [스케줄러] 데이터 재빌드 완료 (소요 시간: ${Math.floor(elapsed / 1000)}초)`);
+    } else {
+      console.error('❌ [스케줄러] executeFullRebuild 함수를 찾을 수 없습니다.');
+    }
   } catch (error) {
     const elapsed = Date.now() - startTime;
     console.error(`❌ [스케줄러] 데이터 재빌드 오류 (소요 시간: ${Math.floor(elapsed / 1000)}초):`, error);
     console.error(`❌ [스케줄러] 재시도 후에도 실패했습니다. 다음 스케줄에서 다시 시도합니다.`);
-  } finally {
-    isRebuilding = false;
-    rebuildStartTime = null;
   }
 }
+
 
 // ============================================================================
 // 서버 시작

@@ -198,6 +198,84 @@ function getRateLimitConfig() {
   }
 }
 
+// 시트 헤더 확인 및 생성
+async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
+  const cacheKey = `headers-${sheetName}-${spreadsheetId}`;
+
+  // 캐시 확인
+  const cached = cacheStore.get(cacheKey); // Changed cacheManager to cacheStore
+  if (cached) {
+    return cached.data; // Return data from cacheStore entry
+  }
+
+  try {
+    const spreadsheet = await withRetryGoogleSheets(async () => {
+      return await sheets.spreadsheets.get({ spreadsheetId });
+    });
+    const sheetExists = spreadsheet.data.sheets.some(s => s.properties.title === sheetName);
+
+    if (!sheetExists) {
+      await withRetryGoogleSheets(async () => {
+        return await sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          resource: {
+            requests: [{
+              addSheet: {
+                properties: {
+                  title: sheetName
+                }
+              }
+            }]
+          }
+        });
+      });
+    }
+
+    const res = await withRetryGoogleSheets(async () => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${sheetName}!1:1`
+      });
+    });
+    const firstRow = res.data.values && res.data.values[0] ? res.data.values[0] : [];
+    const needsInit = firstRow.length === 0 || headers.some((h, i) => (firstRow[i] || '') !== h) || firstRow.length < headers.length;
+
+    if (needsInit) {
+      await withRetryGoogleSheets(async () => {
+        // 컬럼 인덱스를 알파벳으로 변환하는 간단한 로직
+        const getColumnLetter = (columnNumber) => {
+          let result = '';
+          while (columnNumber > 0) {
+            columnNumber--;
+            result = String.fromCharCode(65 + (columnNumber % 26)) + result;
+            columnNumber = Math.floor(columnNumber / 26);
+          }
+          return result;
+        };
+
+        const lastColumn = getColumnLetter(headers.length);
+        return await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range: `${sheetName}!A1:${lastColumn}1`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [headers] }
+        });
+      });
+      cacheStore.delete(cacheKey); // Changed cacheManager to cacheStore
+      return headers;
+    }
+
+    // 캐시 저장 (30분)
+    const expires = Date.now() + (30 * 60 * 1000);
+    cacheStore.set(cacheKey, { data: headers, expires });
+    return headers;
+  } catch (error) {
+    console.error(`[Direct] Failed to ensure sheet headers for ${sheetName}:`, error);
+    cacheStore.delete(cacheKey);
+    throw error;
+  }
+}
+
 // 현재 설정 가져오기
 const rateLimitConfig = getRateLimitConfig();
 const MIN_API_INTERVAL_MS = rateLimitConfig.MIN_API_INTERVAL_MS;
@@ -1481,8 +1559,9 @@ async function rebuildPricingMaster(carriersParam) {
     const supportLoadPromises = [];
     const supportLoadMap = new Map(); // key: pgName, value: pgRange
 
-    for (const [pgName, pgRange] of Object.entries(planGroupRanges)) {
+    for (const [pgNameRaw, pgRange] of Object.entries(planGroupRanges)) {
       if (!pgRange) continue;
+      const pgName = pgNameRaw.trim(); // 🔥 핵심 수정: 키 공백 제거
       supportLoadMap.set(pgName, pgRange);
       supportLoadPromises.push(
         getSheetData(supportSheetId, pgRange)
@@ -2743,8 +2822,12 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
   }
 }
 
+// 재빌드 진행 상태 락 (Global Lock for Rebuild)
+let isRebuilding = false;
+
 function setupDirectRoutes(app) {
   const router = express.Router();
+  // ... (existing code inside setupDirectRoutes)
 
   // === 디버그/검증용 엔드포인트 ===
 
@@ -2957,11 +3040,72 @@ function setupDirectRoutes(app) {
     }
   });
 
+  // 중앙 집중식 데이터 재빌드 실행기
+  async function executeFullRebuild(carriersParam = null) {
+    if (isRebuilding) {
+      throw new Error('재빌드가 이미 진행 중입니다.');
+    }
+
+    try {
+      isRebuilding = true;
+      const carriers = carriersParam || ['SK', 'KT', 'LG'];
+      const results = { summary: {} };
+
+      console.log(`🚀 [Direct][executeFullRebuild] 시작: ${carriers.join(', ')}`);
+
+      // 0. 정책 설정 캐시 무효화 (최신 데이터 읽기 보장)
+      console.log(`[Direct] Invalidating policy settings cache before rebuild`);
+      for (const carrier of carriers) {
+        deleteCache(`policy-settings-${carrier}`);
+      }
+
+      // 1. 요금제 마스터 리빌드
+      console.log(`[Direct] Step 1: Rebuilding Plan Master...`);
+      results.plans = await rebuildPlanMaster(carriers);
+
+      // 구글 시트 API 할당량 여유를 위한 지연 (2초)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // 2. 단말 마스터 리빌드
+      console.log(`[Direct] Step 2: Rebuilding Device Master...`);
+      results.devices = await rebuildDeviceMaster(carriers);
+
+      // 구글 시트 API 할당량 여유를 위한 지연 (2초)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // 3. 단말 요금정책 리빌드
+      console.log(`[Direct] Step 3: Rebuilding Pricing Master...`);
+      results.pricing = await rebuildPricingMaster(carriers);
+
+      // 4. 재빌드 완료 후 모든 관련 캐시 무효화
+      console.log(`[Direct] Step 4: Invalidating all related caches...`);
+      deleteCache('todays-mobiles');
+      for (const carrier of ['SK', 'KT', 'LG']) {
+        deleteCache(`mobiles-${carrier}`);
+        deleteCache(`mobiles-${carrier}-v5`);
+        deleteCache(`mobiles-${carrier}-v6`);
+      }
+      if (typeof invalidateDirectStoreCache === 'function') {
+        invalidateDirectStoreCache();
+      }
+
+      console.log(`✅ [Direct][executeFullRebuild] 모든 단계 완료`);
+      return results;
+    } catch (error) {
+      console.error('❌ [Direct][executeFullRebuild] 오류 발생:', error);
+      throw error;
+    } finally {
+      isRebuilding = false;
+    }
+  }
+
+  // 외부에 함수 연결 (index.js에서 사용 가능하도록 함)
+  setupDirectRoutes.executeFullRebuild = executeFullRebuild;
+  setupDirectRoutes.getIsRebuilding = () => isRebuilding;
+
   router.post('/rebuild-master', async (req, res) => {
     try {
       const carrierParam = (req.query.carrier || '').trim().toUpperCase();
-
-      // 🔥 수정: carrier 파라미터 검증 강화 (SK, KT, LG만 허용)
       if (carrierParam && !['SK', 'KT', 'LG'].includes(carrierParam)) {
         return res.status(400).json({
           success: false,
@@ -2971,57 +3115,24 @@ function setupDirectRoutes(app) {
 
       const carriers = carrierParam ? [carrierParam] : ['SK', 'KT', 'LG'];
 
-      // 🔥 수정: 재빌드 시작 전에 정책 설정 캐시 무효화 (최신 데이터 읽기 보장)
-      console.log(`[Direct] Invalidating policy settings cache before rebuild`);
-      for (const carrier of carriers) {
-        deleteCache(`policy-settings-${carrier}`);
-      }
-
-      // 1. 요금제 마스터 리빌드
-      console.log(`[Direct] Rebuilding Plan Master for ${carriers.join(',')}`);
-      const step1 = await rebuildPlanMaster(carriers);
-
-      // 2. 단말 마스터 리빌드
-      console.log(`[Direct] Rebuilding Device Master for ${carriers.join(',')}`);
-      const step2 = await rebuildDeviceMaster(carriers);
-
-      // 3. 단말 요금정책 리빌드
-      console.log(`[Direct] Rebuilding Pricing Master for ${carriers.join(',')}`);
-      const step3 = await rebuildPricingMaster(carriers);
-
-      // 4. 재빌드 완료 후 모든 관련 캐시 무효화
-      console.log(`[Direct] Invalidating all related caches after rebuild`);
-      deleteCache('todays-mobiles');
-      // 모든 통신사 캐시 무효화 (모든 버전 및 해시 포함)
-      for (const carrier of ['SK', 'KT', 'LG']) {
-        // 기본 캐시 키
-        deleteCache(`mobiles-${carrier}`);
-        // 캐시 버전별 키 (v5, v6 등)
-        deleteCache(`mobiles-${carrier}-v5`);
-        deleteCache(`mobiles-${carrier}-v6`);
-      }
-      // invalidateDirectStoreCache 함수 사용 (모든 관련 캐시 무효화)
-      if (typeof invalidateDirectStoreCache === 'function') {
-        invalidateDirectStoreCache();
-      }
-
-      // 🔥 수정: 응답 형식 개선 (통신사별 카운트 포함)
-      console.log(`✅ [Direct][rebuild-master] 완료: ${carriers.join(', ')}`);
+      const results = await executeFullRebuild(carriers);
 
       return res.json({
         success: true,
         carrier: carrierParam || 'ALL',
         carriers: carriers,
-        deviceCount: step2.totalCount,
-        planCount: step1.totalCount,
-        pricingCount: step3.totalCount,
-        summary: {
-          plans: step1,
-          devices: step2,
-          pricing: step3
-        }
+        deviceCount: results.devices.totalCount,
+        planCount: results.plans.totalCount,
+        pricingCount: results.pricing.totalCount,
+        summary: results
       });
     } catch (error) {
+      if (error.message === '재빌드가 이미 진행 중입니다.') {
+        return res.status(429).json({
+          success: false,
+          error: error.message
+        });
+      }
       console.error('[Direct][rebuild-master] error:', error);
       return res.status(500).json({
         success: false,
@@ -9127,7 +9238,7 @@ function setupDirectRoutes(app) {
 
   // === 매장별 슬라이드쇼 설정 관리 API ===
 
-  // GET /api/direct/store-slideshow-settings?storeId=xxx: 매장별 슬라이드쇼 설정 조회
+  // GET /api/direct/store-slideshow-settings?storeId=xxx: 매장별 슬라이드쇼 설정 조회 (캐싱 및 중복 요청 방지 적용)
   router.get('/store-slideshow-settings', async (req, res) => {
     try {
       const storeId = req.query.storeId;
@@ -9135,21 +9246,39 @@ function setupDirectRoutes(app) {
         return res.status(400).json({ success: false, error: '매장ID가 필요합니다.' });
       }
 
-      const { sheets, SPREADSHEET_ID } = createSheetsClient();
+      // 캐시 키 생성 (모든 매장 설정은 같은 시트에 있으므로 단일 키 사용 권장하지만, 
+      // 여기서는 전체 시트 데이터를 캐싱하여 필터링하는 방식을 사용)
+      const cacheKey = `store-settings-all`;
+      const CACHE_TTL = 60 * 1000; // 1분 캐싱
 
-      // 시트 헤더 확인 및 생성
-      await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
+      // 중복 요청 방지 및 캐싱 적용
+      const allSettings = await withRequestDeduplication(cacheKey, async () => {
+        // 1. 캐시 확인
+        const cached = cacheManager.get(cacheKey);
+        if (cached) return cached;
 
-      // 매장별 설정 조회
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_SETTINGS}!A:E`
+        const { sheets, SPREADSHEET_ID } = createSheetsClient();
+
+        // 2. 시트 헤더 확인 (캐시된 경우 스킵됨)
+        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
+
+        // 3. 데이터 조회 (Retry 적용)
+        const response = await withRetry(async () => {
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_SETTINGS}!A:E`
+          });
+        });
+
+        const rows = (response.data.values || []).slice(1);
+
+        // 캐시 저장
+        cacheManager.set(cacheKey, rows, CACHE_TTL);
+        return rows;
       });
 
-      const rows = (response.data.values || []).slice(1);
-
-      // 매장별 슬라이드쇼 설정 찾기
-      const storeSetting = rows.find(row => {
+      // 매장별 슬라이드쇼 설정 찾기 (메모리상에서 필터링)
+      const storeSetting = allSettings.find(row => {
         const settingType = (row[1] || '').trim();
         const settingJson = (row[4] || '').trim();
         if (settingType === 'slideshowSettings') {

@@ -65,10 +65,7 @@ const PolicySettingsTab = () => {
     const [margin, setMargin] = useState(0);
 
     // 2. 부가서비스 설정 리스트
-    const [addons, setAddons] = useState([
-        { id: 1, name: 'V컬러링', fee: 3300, incentive: 1000, deduction: 0 },
-        { id: 2, name: '우주패스', fee: 9900, incentive: 5000, deduction: 2000 }
-    ]);
+    const [addons, setAddons] = useState([]);
     // 부가서비스 입력 폼 상태
     const [newAddon, setNewAddon] = useState({ name: '', fee: '', incentive: '', deduction: '', description: '', url: '' });
     // 부가서비스 수정 중인 항목 ID

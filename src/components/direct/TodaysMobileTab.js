@@ -591,25 +591,26 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
       // 혹시 모를 경우를 대비해 '번호이동'도 시도 (양방향 매핑)
       const alternativeType = type === 'MNP' ? '번호이동' : (type === '번호이동' ? 'MNP' : null);
 
-      // 1순위: 요금제군별 키로 찾기 `${modelId}-${planGroup}-${openingType}`
-      const planGroupKey = `${modelId}-${defaultPlanGroup}-${type}`;
-      let pricing = masterPricing[planGroupKey];
+      // 1순위: planGroup 포함된 키 `${modelId}-${planGroup}-${openingType}`
+      const primaryKey = `${modelId.toUpperCase()}-${defaultPlanGroup}-${type}`;
+      let pricing = masterPricing[primaryKey];
 
-      // 1-1순위: 대체 타입으로 요금제군별 키 시도 (MNP <-> 번호이동)
+      // 1-1순위: 대체 타입으로 시도 (MNP <-> 번호이동)
+      // 예: 원래는 'MNP'로 찾았는데 없으면 '번호이동'으로도 찾아봄 (혹은 반대)
       if (!pricing && alternativeType) {
-        const altPlanGroupKey = `${modelId}-${defaultPlanGroup}-${alternativeType}`;
+        const altPlanGroupKey = `${modelId.toUpperCase()}-${defaultPlanGroup}-${alternativeType}`;
         pricing = masterPricing[altPlanGroupKey];
       }
 
       // 2순위: 기본 키로 찾기 `${modelId}-${openingType}` (요금제군별 키가 없을 때)
       if (!pricing) {
-        const basicKey = `${modelId}-${type}`;
+        const basicKey = `${modelId.toUpperCase()}-${type}`;
         pricing = masterPricing[basicKey];
       }
 
       // 2-1순위: 대체 타입으로 기본 키 시도 (MNP <-> 번호이동)
       if (!pricing && alternativeType) {
-        const altBasicKey = `${modelId}-${alternativeType}`;
+        const altBasicKey = `${modelId.toUpperCase()}-${alternativeType}`;
         pricing = masterPricing[altBasicKey];
       }
 
@@ -1694,9 +1695,9 @@ const TodaysMobileTab = ({ isFullScreen, onProductSelect, loggedInStore }) => {
                   <Box sx={{
                     height: '100%', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, p: 1
                   }}>
-                    {slideshowData[manualSlideIndex]?.products?.map(product => (
+                    {slideshowData[manualSlideIndex]?.products?.map((product, index) => (
                       <TodaysProductCard
-                        key={`manual-${product.id}`}
+                        key={product.id ? `manual-${product.id}` : `manual-idx-${index}`}
                         product={product}
                         isPremium={product.isPremium}
                         priceData={getPriceDataForProduct(product)}
