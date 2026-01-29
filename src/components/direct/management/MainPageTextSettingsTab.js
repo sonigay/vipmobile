@@ -68,7 +68,7 @@ const MainPageTextSettingsTab = () => {
       setLoading(true);
       setError(null);
       const startTime = Date.now();
-      const response = await directStoreApiClient.getMainPageTexts();
+      const response = await directStoreApiClient.getMainPageTexts(true);
       const duration = Date.now() - startTime;
 
 

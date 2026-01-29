@@ -113,7 +113,7 @@ const LinkSettingsTab = () => {
             try {
                 setLoading(true);
                 const startTime = Date.now();
-                const data = await directStoreApiClient.getLinkSettings(carrier);
+                const data = await directStoreApiClient.getLinkSettings(carrier, true);
                 const duration = Date.now() - startTime;
 
 

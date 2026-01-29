@@ -67,6 +67,7 @@ class DirectStoreDAL {
       }
 
       return {
+        id: data[0].id,
         carrier: data[0]['통신사'],
         margin: parseInt(data[0]['마진']) || 0
       };
@@ -84,6 +85,7 @@ class DirectStoreDAL {
       const data = await this.dal.read('direct_store_policy_addon_services', { '통신사': carrier });
 
       return data.map(row => ({
+        id: row.id,
         carrier: row['통신사'],
         serviceName: row['서비스명'],
         monthlyFee: parseInt(row['월요금']) || 0,
@@ -106,6 +108,7 @@ class DirectStoreDAL {
       const data = await this.dal.read('direct_store_policy_insurance', { '통신사': carrier });
 
       return data.map(row => ({
+        id: row.id,
         carrier: row['통신사'],
         productName: row['보험상품명'],
         minPrice: parseInt(row['출고가최소']) || 0,
@@ -132,12 +135,20 @@ class DirectStoreDAL {
       return data.map(row => {
         let conditionJson = null;
         try {
-          conditionJson = row['조건JSON'] ? JSON.parse(row['조건JSON']) : null;
+          const raw = row['조건JSON'];
+          if (raw && typeof raw === 'object') {
+            conditionJson = raw;
+          } else if (raw && typeof raw === 'string') {
+            conditionJson = JSON.parse(raw);
+          }
         } catch (e) {
           console.warn('[DirectStoreDAL] 조건JSON 파싱 실패:', row['조건JSON']);
         }
 
+        console.log(`[DirectStoreDAL] 특별 정책 레코드 변환 (${carrier}): id=${row.id}, name=${row['정책명']}`);
+
         return {
+          id: row.id,
           carrier: row['통신사'],
           policyName: row['정책명'],
           policyType: row['정책타입'],
@@ -167,12 +178,18 @@ class DirectStoreDAL {
       return data.map(row => {
         let settingsJson = null;
         try {
-          settingsJson = row['설정값JSON'] ? JSON.parse(row['설정값JSON']) : null;
+          const raw = row['설정값JSON'];
+          if (raw && typeof raw === 'object') {
+            settingsJson = raw;
+          } else if (raw && typeof raw === 'string') {
+            settingsJson = JSON.parse(raw);
+          }
         } catch (e) {
           console.warn('[DirectStoreDAL] 설정값JSON 파싱 실패:', row['설정값JSON']);
         }
 
         return {
+          id: row.id,
           carrier: row['통신사'],
           settingType: row['설정유형'],
           sheetId: row['시트ID'],
@@ -1517,6 +1534,162 @@ class DirectStoreDAL {
       return { success: true };
     } catch (error) {
       console.error('[DirectStoreDAL] 단말 요금정책 삭제 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 링크 설정 삭제 (Supabase)
+   */
+  async deleteLinkSettings(carrier, settingType) {
+    try {
+      const { error } = await supabase
+        .from('direct_store_settings')
+        .delete()
+        .eq('통신사', carrier)
+        .eq('설정유형', settingType);
+
+      if (error) {
+        throw new Error(`DB Delete Error: ${error.message}`);
+      }
+
+      console.log(`[DirectStoreDAL] 링크 설정 삭제 완료: ${carrier} - ${settingType}`);
+      return { success: true };
+    } catch (error) {
+      console.error('[DirectStoreDAL] 링크 설정 삭제 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 정책 마진 저장 (Supabase)
+   */
+  async savePolicyMargin(carrier, margin) {
+    try {
+      const { error } = await supabase
+        .from('direct_store_policy_margin')
+        .upsert({
+          '통신사': carrier,
+          '마진': margin
+        }, { onConflict: '통신사' });
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('[DirectStoreDAL] 정책 마진 저장 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 부가서비스 정책 저장 (Supabase)
+   */
+  async savePolicyAddonServices(carrier, addonList) {
+    try {
+      // 해당 통신사 데이터 먼저 일괄 삭제 (중복 방지)
+      await supabase.from('direct_store_policy_addon_services').delete().eq('통신사', carrier);
+
+      if (addonList && addonList.length > 0) {
+        const insertData = addonList.map(item => ({
+          '통신사': carrier,
+          '서비스명': item.name || '',
+          '월요금': item.fee || 0,
+          '유치추가금액': item.incentive || 0,
+          '미유치차감금액': item.deduction || 0,
+          '상세설명': item.description || '',
+          '공식사이트URL': item.url || ''
+        }));
+        const { error } = await supabase.from('direct_store_policy_addon_services').insert(insertData);
+        if (error) throw error;
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('[DirectStoreDAL] 부가서비스 정책 저장 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 보험상품 정책 저장 (Supabase)
+   */
+  async savePolicyInsurance(carrier, insuranceList) {
+    try {
+      // 해당 통신사 데이터 먼저 일괄 삭제 (중복 방지)
+      await supabase.from('direct_store_policy_insurance').delete().eq('통신사', carrier);
+
+      if (insuranceList && insuranceList.length > 0) {
+        const insertData = insuranceList.map(item => ({
+          '통신사': carrier,
+          '보험상품명': item.name || '',
+          '출고가최소': item.minPrice || 0,
+          '출고가최대': item.maxPrice || 0,
+          '월요금': item.fee || 0,
+          '유치추가금액': item.incentive || 0,
+          '미유치차감금액': item.deduction || 0,
+          '상세설명': item.description || '',
+          '공식사이트URL': item.url || ''
+        }));
+        const { error } = await supabase.from('direct_store_policy_insurance').insert(insertData);
+        if (error) throw error;
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('[DirectStoreDAL] 보험상품 정책 저장 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 특별 정책(별도정책) 저장 (Supabase)
+   */
+  async savePolicySpecial(carrier, specialList) {
+    try {
+      // 해당 통신사 데이터 먼저 일괄 삭제 (중복 방지)
+      await supabase.from('direct_store_policy_special').delete().eq('통신사', carrier);
+
+      if (specialList && specialList.length > 0) {
+        const insertData = specialList.map(item => ({
+          '통신사': carrier,
+          '정책명': item.name || '',
+          '정책타입': item.policyType || 'general',
+          '금액': item.amount || 0,
+          '적용여부': item.isActive !== false,
+          '조건JSON': item.conditionsJson ? (typeof item.conditionsJson === 'string' ? item.conditionsJson : JSON.stringify(item.conditionsJson)) : null
+        }));
+        const { error } = await supabase.from('direct_store_policy_special').insert(insertData);
+        if (error) throw error;
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('[DirectStoreDAL] 특별 정책 저장 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 링크 설정 저장 (Supabase)
+   */
+  async saveLinkSettings(carrier, settingType, sheetId, settingsJson) {
+    try {
+      // Upsert (통신사 + 설정유형 기준)
+      const { data, error } = await supabase
+        .from('direct_store_settings')
+        .upsert({
+          '통신사': carrier,
+          '설정유형': settingType,
+          '시트ID': sheetId,
+          '설정값JSON': typeof settingsJson === 'string' ? settingsJson : JSON.stringify(settingsJson)
+        })
+        .select();
+
+      if (error) {
+        throw new Error(`DB Upsert Error: ${error.message}`);
+      }
+
+      console.log(`[DirectStoreDAL] 링크 설정 저장 완료: ${carrier} - ${settingType}`);
+      return { success: true, data };
+    } catch (error) {
+      console.error('[DirectStoreDAL] 링크 설정 저장 실패:', error);
       throw error;
     }
   }

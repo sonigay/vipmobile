@@ -667,9 +667,9 @@ export const directStoreApiClient = {
   /**
    * 메인페이지 문구 조회
    */
-  getMainPageTexts: async () => {
+  getMainPageTexts: async (forceRefresh = false) => {
     try {
-      return await smartFetch(`${BASE_URL}/main-page-texts`, {}, { errorMessage: '문구 조회 실패' });
+      return await smartFetch(`${BASE_URL}/main-page-texts`, {}, { errorMessage: '문구 조회 실패', useCache: !forceRefresh, forceRefresh });
     } catch (error) {
       console.error('문구 조회 실패:', error);
       return { success: false, error: normalizeErrorMessage(error) };

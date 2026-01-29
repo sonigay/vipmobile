@@ -113,7 +113,7 @@ const PolicySettingsTab = () => {
             try {
                 setLoading(true);
                 const startTime = Date.now();
-                const data = await directStoreApiClient.getPolicySettings(carrier);
+                const data = await directStoreApiClient.getPolicySettings(carrier, true);
                 const duration = Date.now() - startTime;
 
 
@@ -684,8 +684,10 @@ const PolicySettingsTab = () => {
                                 <React.Fragment key={addon.id}>
                                     <ListItem>
                                         <ListItemText
+                                            primaryTypographyProps={{ component: 'div' }}
+                                            secondaryTypographyProps={{ component: 'div' }}
                                             primary={
-                                                <Typography fontWeight="bold">{addon.name}</Typography>
+                                                <Typography fontWeight="bold" component="div">{addon.name}</Typography>
                                             }
                                             secondary={
                                                 <Box>
@@ -825,8 +827,10 @@ const PolicySettingsTab = () => {
                                         <React.Fragment key={insurance.id}>
                                             <ListItem>
                                                 <ListItemText
+                                                    primaryTypographyProps={{ component: 'div' }}
+                                                    secondaryTypographyProps={{ component: 'div' }}
                                                     primary={
-                                                        <Typography fontWeight="bold">{insurance.name}</Typography>
+                                                        <Typography fontWeight="bold" component="div">{insurance.name}</Typography>
                                                     }
                                                     secondary={
                                                         <Box>
@@ -1201,9 +1205,11 @@ const PolicySettingsTab = () => {
                                             sx={{ mr: 2 }}
                                         />
                                         <ListItemText
+                                            primaryTypographyProps={{ component: 'div' }}
+                                            secondaryTypographyProps={{ component: 'div' }}
                                             primary={
                                                 <Stack direction="row" spacing={1} alignItems="center">
-                                                    <Typography fontWeight="bold" color={policy.isActive ? 'text.primary' : 'text.disabled'}>
+                                                    <Typography fontWeight="bold" component="div" color={policy.isActive ? 'text.primary' : 'text.disabled'}>
                                                         {policy.name}
                                                     </Typography>
                                                     {!policy.isActive && <Chip label="미적용" size="small" />}

@@ -72,14 +72,22 @@ class FeatureFlagManager {
   isEnabled(key) {
     if (!key) return false;
 
-    // 1. 구체적인 키 확인 (ex: "quick-service:list")
-    if (this.flags[key] !== undefined) {
-      return this.flags[key];
+    // 키 정규화 (소문자 변환 및 하이픈 제거)
+    const normalize = (k) => k.toLowerCase().replace(/-/g, '');
+    const normalizedKey = normalize(key);
+
+    // 1. 구체적인 키 확인 (정규화된 이름으로 비교)
+    const foundDirect = Object.entries(this.flags).find(([k]) => normalize(k) === normalizedKey);
+    if (foundDirect) {
+      return foundDirect[1];
     }
 
     // 2. 상위 모드 수준의 키 확인 (ex: "quick-service")
     const parentMode = key.split(':')[0];
-    return this.flags[parentMode] || false;
+    const normalizedParent = normalize(parentMode);
+    const foundParent = Object.entries(this.flags).find(([k]) => normalize(k) === normalizedParent);
+
+    return foundParent ? foundParent[1] : false;
   }
 
   /**

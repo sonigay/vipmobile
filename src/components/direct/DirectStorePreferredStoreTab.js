@@ -75,7 +75,13 @@ const DirectStorePreferredStoreTab = ({ loggedInStore, isManagementMode = false,
                     });
                 },
                 (error) => {
-                    console.error('Geolocation error:', error);
+                    // 위치 정보 접근 거부(code 1)인 경우는 경고만 출력하고 기본 위치 사용
+                    if (error.code === 1) {
+                        console.warn('사용자가 위치 정보 제공을 거부했습니다. 기본 위치를 사용합니다.');
+                    } else {
+                        console.error('Geolocation error:', error);
+                    }
+
                     // 위치 정보 실패 시: 직영점모드는 접속 매장 중심, 관리모드는 평택 중심
                     if (isManagementMode) {
                         // 관리모드: 평택 중심 좌표 설정 (인천과 청주지역까지 보이도록)

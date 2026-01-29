@@ -173,29 +173,15 @@ let currentSheetsRequests = 0;
 
 // 🔥 Feature Flag에 따라 동적으로 설정 변경
 function getRateLimitConfig() {
-  const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true' ||
-    process.env.USE_DB_POLICY === 'true' ||
-    process.env.USE_DB_CUSTOMER === 'true';
-
-  if (useDatabase) {
-    // Supabase 사용 시: Rate Limit 제한 완화 (빠른 응답)
-    return {
-      MIN_API_INTERVAL_MS: 100, // 0.1초 간격 (거의 제한 없음)
-      MAX_CONCURRENT_REQUESTS: 10, // 동시 요청 10개
-      CACHE_FRESH_TTL: 5 * 60 * 1000, // 5분
-      CACHE_STALE_TTL: 30 * 60 * 1000, // 30분
-      BASE_RETRY_DELAY: 1000 // 1초
-    };
-  } else {
-    // Google Sheets 사용 시: Rate Limit 엄격 적용
-    return {
-      MIN_API_INTERVAL_MS: 2000, // 2초 간격
-      MAX_CONCURRENT_REQUESTS: 2, // 동시 요청 2개
-      CACHE_FRESH_TTL: 10 * 60 * 1000, // 10분
-      CACHE_STALE_TTL: 60 * 60 * 1000, // 60분
-      BASE_RETRY_DELAY: 3000 // 3초
-    };
-  }
+  // Google Sheets API는 DB 사용 여부와 관계없이 항상 엄격한 제한을 적용해야 합니다.
+  // DB(Supabase)를 사용하더라도 소스 데이터는 Sheet에서 읽어오기 때문입니다.
+  return {
+    MIN_API_INTERVAL_MS: 2000, // 2초 간격 (엄격 제한)
+    MAX_CONCURRENT_REQUESTS: 2, // 동시 요청 2개
+    CACHE_FRESH_TTL: 10 * 60 * 1000, // 10분
+    CACHE_STALE_TTL: 60 * 60 * 1000, // 60분
+    BASE_RETRY_DELAY: 3000 // 3초
+  };
 }
 
 // 시트 헤더 확인 및 생성
@@ -2343,6 +2329,10 @@ async function refreshImagesFromDiscord(carrier) {
       const DirectStoreDAL = require('./dal/DirectStoreDAL');
       for (const update of supabaseUpdates) {
         try {
+          if (!update.id) {
+            console.warn(`⚠️ [refreshImagesFromDiscord] 업데이트 스킵: 모델 ${update.modelId}의 DB ID가 없습니다.`);
+            continue;
+          }
           await DirectStoreDAL.updateModelImageUrl(update.id, update.imageUrl);
         } catch (error) {
           console.error(`❌ [refreshImagesFromDiscord] Supabase 업데이트 실패: ${update.modelId}`, error);
@@ -4232,16 +4222,36 @@ function setupDirectRoutes(app) {
             conditionsJson: item.condition
           }));
 
+          // 중복 제거 헬퍼 함수
+          const removeDuplicates = (list, key = 'name') => {
+            const seen = new Set();
+            return list.filter(item => {
+              const val = (item[key] || '').toString().trim();
+              if (seen.has(val)) return false;
+              seen.add(val);
+              return true;
+            });
+          };
+
           const result = {
             success: true,
             margin: { baseMargin: margin },
-            addon: { list: addons },
-            insurance: { list: insurances },
-            special: { list: specialPolicies }
+            addon: { list: removeDuplicates(addons) },
+            insurance: { list: removeDuplicates(insurances) },
+            special: { list: removeDuplicates(specialPolicies) }
           };
 
-          console.log(`✅ [GET /api/direct/policy-settings] Supabase에서 데이터 읽기 완료 (${carrier})`);
-          return res.json(result);
+          // 🔥 수파베이스에 마진은 있어도 서비스 리스트들이 전무하면 구글 시트에서 데이터를 가져오도록 폴백 허용
+          // 특히 사용자가 시트 데이터를 신뢰하는 상황이므로, 특별 정책(specialPolicies)이 비어있으면 폴백합니다.
+          const hasMinimumData = marginData !== null && (addons.length > 0 || insurances.length > 0 || specialPolicies.length > 0);
+
+          if (!hasMinimumData || noCache || specialPolicies.length === 0) {
+            console.log(`⚠️ [GET /api/direct/policy-settings] 데이터 보완 필요 (${carrier}): 마진=${!!marginData}, 부가=${addons.length}, 보험=${insurances.length}, 특별=${specialPolicies.length} -> Google Sheets에서 확인합니다.`);
+            // return res.json(result); 를 하지 않고 그대로 흘려보내면 아래의 Google Sheets 로직이 실행됨
+          } else {
+            console.log(`✅ [GET /api/direct/policy-settings] Supabase에서 데이터 읽기 완료 (${carrier})`);
+            return res.json(result);
+          }
         } catch (supabaseError) {
           console.error(`⚠️ [GET /api/direct/policy-settings] Supabase 실패, Google Sheets로 폴백:`, supabaseError.message);
           // Google Sheets 폴백으로 계속 진행
@@ -4371,12 +4381,23 @@ function setupDirectRoutes(app) {
           };
         });
 
+      // 중복 제거 헬퍼 함수
+      const removeDuplicates = (list, key = 'name') => {
+        const seen = new Set();
+        return list.filter(item => {
+          const val = (item[key] || '').toString().trim();
+          if (seen.has(val)) return false;
+          seen.add(val);
+          return true;
+        });
+      };
+
       const result = {
         success: true,
         margin: { baseMargin: margin },
-        addon: { list: addons },
-        insurance: { list: insurances },
-        special: { list: specialPolicies }
+        addon: { list: removeDuplicates(addons) },
+        insurance: { list: removeDuplicates(insurances) },
+        special: { list: removeDuplicates(specialPolicies) }
       };
 
       // 캐시 저장 (5분)
@@ -4395,6 +4416,22 @@ function setupDirectRoutes(app) {
       const carrier = req.query.carrier || 'SK';
       const { margin, addon, insurance, special } = req.body || {};
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
+
+      // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에도 저장
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+      if (useDatabase) {
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+
+        // 병렬로 Supabase 저장 실행
+        await Promise.all([
+          margin && margin.baseMargin !== undefined ? DirectStoreDAL.savePolicyMargin(carrier, margin.baseMargin) : Promise.resolve(),
+          addon && addon.list ? DirectStoreDAL.savePolicyAddonServices(carrier, addon.list) : Promise.resolve(),
+          insurance && insurance.list ? DirectStoreDAL.savePolicyInsurance(carrier, insurance.list) : Promise.resolve(),
+          special && special.list ? DirectStoreDAL.savePolicySpecial(carrier, special.list) : Promise.resolve()
+        ]);
+
+        console.log(`✅ [POST /api/direct/policy-settings] Supabase 저장 완료 (${carrier})`);
+      }
 
       // 마진 설정 저장
       if (margin && margin.baseMargin !== undefined) {
@@ -4763,59 +4800,82 @@ function setupDirectRoutes(app) {
           return await DirectStoreDAL.getSettings(carrier);
         });
 
-        // 설정 유형별로 그룹화
-        const planGroupRow = settingsData.find(row => row.settingType === 'planGroup');
-        const supportRow = settingsData.find(row => row.settingType === 'support');
-        const policyRow = settingsData.find(row => row.settingType === 'policy');
+        // 🔥 수파베이스에 설정이 하나라도 있으면 처리 후 반환
+        if (settingsData && settingsData.length > 0) {
+          // 🔥 디버그 로그 추가
+          console.log(`[LinkSettings] Supabase 원본 데이터 (${carrier}):`, JSON.stringify(settingsData, null, 2));
 
-        let planGroup = { link: '', planGroups: [] };
-        let support = { link: '' };
-        let policy = { link: '' };
-
-        if (planGroupRow) {
-          const settingsJson = planGroupRow.settings || {};
-          planGroup = {
-            link: planGroupRow.sheetId || '',
-            sheetId: planGroupRow.sheetId || '',
-            planNameRange: settingsJson.planNameRange || '',
-            planGroupRange: settingsJson.planGroupRange || '',
-            basicFeeRange: settingsJson.basicFeeRange || '',
-            planGroups: settingsJson.planGroups || []
+          // 설정 유형별로 그룹화 (한글/영어 라벨 모두 대응)
+          const findSetting = (data, type) => {
+            const labels = {
+              'planGroup': ['planGroup', '요금제그룹', '요금제그룹핑', '요금제'],
+              'support': ['support', '이통사지원금', '공시지원금', '지원금'],
+              'policy': ['policy', '정책표', '리베이트', '정책', '단말정책']
+            }[type] || [type];
+            const found = data.find(row => labels.some(label => row.settingType === label));
+            if (found) {
+              console.log(`[LinkSettings] ${carrier} ${type} 매칭 성공: settingType=${found.settingType}`);
+            } else {
+              console.warn(`[LinkSettings] ${carrier} ${type} 매칭 실패: labels=[${labels.join(', ')}]`);
+            }
+            return found;
           };
+
+          const planGroupRow = findSetting(settingsData, 'planGroup');
+          const supportRow = findSetting(settingsData, 'support');
+          const policyRow = findSetting(settingsData, 'policy');
+
+          let planGroup = { link: '', planGroups: [] };
+          let support = { link: '' };
+          let policy = { link: '' };
+
+          if (planGroupRow) {
+            const settingsJson = planGroupRow.settings || {};
+            planGroup = {
+              link: planGroupRow.sheetId || '',
+              sheetId: planGroupRow.sheetId || '',
+              planNameRange: settingsJson.planNameRange || '',
+              planGroupRange: settingsJson.planGroupRange || '',
+              basicFeeRange: settingsJson.basicFeeRange || '',
+              planGroups: settingsJson.planGroups || []
+            };
+          }
+
+          if (supportRow) {
+            const settingsJson = supportRow.settings || {};
+            support = {
+              link: supportRow.sheetId || '',
+              sheetId: supportRow.sheetId || '',
+              modelRange: settingsJson.modelRange || '',
+              petNameRange: settingsJson.petNameRange || '',
+              factoryPriceRange: settingsJson.factoryPriceRange || '',
+              openingTypeRange: settingsJson.openingTypeRange || '',
+              planGroupRanges: settingsJson.planGroupRanges || {}
+            };
+          }
+
+          if (policyRow) {
+            const settingsJson = policyRow.settings || {};
+            policy = {
+              link: policyRow.sheetId || '',
+              sheetId: policyRow.sheetId || '',
+              modelRange: settingsJson.modelRange || '',
+              petNameRange: settingsJson.petNameRange || '',
+              planGroupRanges: settingsJson.planGroupRanges || {}
+            };
+          }
+
+          console.log(`✅ [GET /api/direct/link-settings] Supabase에서 데이터 읽기 완료 (${carrier})`);
+
+          return res.json({
+            success: true,
+            planGroup,
+            support,
+            policy
+          });
         }
 
-        if (supportRow) {
-          const settingsJson = supportRow.settings || {};
-          support = {
-            link: supportRow.sheetId || '',
-            sheetId: supportRow.sheetId || '',
-            modelRange: settingsJson.modelRange || '',
-            petNameRange: settingsJson.petNameRange || '',
-            factoryPriceRange: settingsJson.factoryPriceRange || '',
-            openingTypeRange: settingsJson.openingTypeRange || '',
-            planGroupRanges: settingsJson.planGroupRanges || {}
-          };
-        }
-
-        if (policyRow) {
-          const settingsJson = policyRow.settings || {};
-          policy = {
-            link: policyRow.sheetId || '',
-            sheetId: policyRow.sheetId || '',
-            modelRange: settingsJson.modelRange || '',
-            petNameRange: settingsJson.petNameRange || '',
-            planGroupRanges: settingsJson.planGroupRanges || {}
-          };
-        }
-
-        console.log(`✅ [GET /api/direct/link-settings] Supabase에서 데이터 읽기 완료 (${carrier})`);
-
-        return res.json({
-          success: true,
-          planGroup,
-          support,
-          policy
-        });
+        console.warn(`⚠️ [LinkSettings] Supabase에 ${carrier} 설정이 없습니다. Google Sheets로 폴백합니다.`);
       }
 
       // Google Sheets에서 읽기 (기존 로직)
@@ -4824,23 +4884,45 @@ function setupDirectRoutes(app) {
       // 캐시된 링크 설정 사용 (중복 호출 및 rate limit 감소)
       const carrierSettings = await getLinkSettings(carrier);
 
-      // 설정 유형별로 그룹화
-      const planGroupRow = carrierSettings.find(row => (row[1] || '').trim() === 'planGroup');
-      const supportRow = carrierSettings.find(row => (row[1] || '').trim() === 'support');
-      const policyRow = carrierSettings.find(row => (row[1] || '').trim() === 'policy');
+
+      // 설정 유형별로 그룹화 (한글/영어 라벨 모두 대응)
+      const findRow = (settings, type) => {
+        const labels = {
+          'planGroup': ['planGroup', '요금제그룹', '요금제그룹핑', '요금제'],
+          'support': ['support', '이통사지원금', '공시지원금', '지원금'],
+          'policy': ['policy', '정책표', '리베이트', '정책', '단말정책']
+        }[type] || [type];
+
+        const found = settings.find(row => labels.some(label => (row[1] || '').trim() === label));
+        if (found) {
+          console.log(`[LinkSettings] ${carrier} ${type} 매칭 성공: Label=${found[1]}`);
+        } else {
+          console.warn(`[LinkSettings] ${carrier} ${type} 매칭 실패: 검색라벨=[${labels.join(', ')}]`);
+        }
+        return found;
+      };
+
+      const planGroupRow = findRow(carrierSettings, 'planGroup');
+      const supportRow = findRow(carrierSettings, 'support');
+      const policyRow = findRow(carrierSettings, 'policy');
+
+      // JSON 데이터 추출 헬퍼 (E열 우선, 없으면 D열 확인)
+      const getJson = (row) => {
+        if (!row) return {};
+        const jsonStr = row[4] || row[3] || '';
+        try {
+          return (jsonStr && (jsonStr.startsWith('{') || jsonStr.startsWith('['))) ? JSON.parse(jsonStr) : {};
+        } catch (e) {
+          return {};
+        }
+      };
 
       let planGroup = { link: '', planGroups: [] };
       let support = { link: '' };
       let policy = { link: '' };
 
       if (planGroupRow) {
-        let settingsJson = {};
-        try {
-          settingsJson = planGroupRow[4] ? JSON.parse(planGroupRow[4]) : {};
-        } catch (parseErr) {
-          console.error(`[Direct] ${carrier} planGroup 설정 JSON 파싱 실패:`, parseErr);
-          console.error(`[Direct] JSON 문자열:`, planGroupRow[4]);
-        }
+        const settingsJson = getJson(planGroupRow);
         planGroup = {
           link: planGroupRow[2] || '', // 시트ID
           sheetId: planGroupRow[2] || '',
@@ -4852,13 +4934,7 @@ function setupDirectRoutes(app) {
       }
 
       if (supportRow) {
-        let settingsJson = {};
-        try {
-          settingsJson = supportRow[4] ? JSON.parse(supportRow[4]) : {};
-        } catch (parseErr) {
-          console.error(`[Direct] ${carrier} support 설정 JSON 파싱 실패:`, parseErr);
-          console.error(`[Direct] JSON 문자열:`, supportRow[4]);
-        }
+        const settingsJson = getJson(supportRow);
         support = {
           link: supportRow[2] || '',
           sheetId: supportRow[2] || '',
@@ -4871,13 +4947,7 @@ function setupDirectRoutes(app) {
       }
 
       if (policyRow) {
-        let settingsJson = {};
-        try {
-          settingsJson = policyRow[4] ? JSON.parse(policyRow[4]) : {};
-        } catch (parseErr) {
-          console.error(`[Direct] ${carrier} policy 설정 JSON 파싱 실패:`, parseErr);
-          console.error(`[Direct] JSON 문자열:`, policyRow[4]);
-        }
+        const settingsJson = getJson(policyRow);
         policy = {
           link: policyRow[2] || '',
           sheetId: policyRow[2] || '',
@@ -4886,6 +4956,12 @@ function setupDirectRoutes(app) {
           planGroupRanges: settingsJson.planGroupRanges || {}
         };
       }
+
+      console.log(`✅ [GET /api/direct/link-settings] 분석 완료 (${carrier} - Sheets):`, {
+        planGroupCount: planGroup.planGroups.length,
+        hasSupport: !!support.link,
+        hasPolicy: !!policy.link
+      });
 
       res.json({
         success: true,
@@ -4952,9 +5028,17 @@ function setupDirectRoutes(app) {
 
       const rows = (response.data.values || []).slice(1);
 
-      // 삭제할 행 찾기
+
+      // 삭제할 행 찾기 (한글/영어 라벨 모두 대응)
+      const labels = {
+        'planGroup': ['planGroup', '요금제그룹', '요금제그룹핑'],
+        'support': ['support', '이통사지원금', '공시지원금'],
+        'policy': ['policy', '정책표', '리베이트']
+      }[settingType] || [settingType];
+
       const rowIndex = rows.findIndex(row =>
-        (row[0] || '').trim() === carrier && (row[1] || '').trim() === settingType
+        (row[0] || '').trim() === carrier &&
+        labels.some(label => (row[1] || '').trim() === label)
       );
 
       if (rowIndex === -1) {
@@ -5110,8 +5194,48 @@ function setupDirectRoutes(app) {
       const carrier = req.query.carrier || 'SK';
       const { planGroup, support, policy } = req.body || {};
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
+
+      // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에 저장
+      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+
+      if (useDatabase) {
+        console.log(`💾 [POST /api/direct/link-settings] Supabase에 데이터 저장 시작 (${carrier})`);
+        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+
+        const saveToSupabase = async (type, data) => {
+          if (!data) return;
+          const settingsJson = data; // 이미 밖에서 정규화된 형태의 데이터를 받음
+
+          await withRetrySupabase(async () => {
+            return await DirectStoreDAL.saveLinkSettings(carrier, type, data.sheetId || data.link || '', settingsJson);
+          });
+        };
+
+        if (planGroup) await saveToSupabase('planGroup', {
+          sheetId: planGroup.sheetId || planGroup.link || '',
+          planNameRange: planGroup.planNameRange || '',
+          planGroupRange: planGroup.planGroupRange || '',
+          basicFeeRange: planGroup.basicFeeRange || '',
+          planGroups: planGroup.planGroups || []
+        });
+        if (support) await saveToSupabase('support', {
+          sheetId: support.sheetId || support.link || '',
+          modelRange: support.modelRange || '',
+          petNameRange: support.petNameRange || '',
+          factoryPriceRange: support.factoryPriceRange || '',
+          openingTypeRange: support.openingTypeRange || '',
+          planGroupRanges: support.planGroupRanges || {}
+        });
+        if (policy) await saveToSupabase('policy', {
+          sheetId: policy.sheetId || policy.link || '',
+          modelRange: policy.modelRange || '',
+          petNameRange: policy.petNameRange || '',
+          planGroupRanges: policy.planGroupRanges || {}
+        });
+
+        return res.json({ success: true, message: 'Supabase에 설정이 저장되었습니다.' });
+      }
 
       // planGroup 저장 시, planGroupRange가 있고 planGroups가 비어있으면 자동으로 추출
       if (planGroup && planGroup.planGroupRange && (!planGroup.planGroups || planGroup.planGroups.length === 0)) {
@@ -5148,15 +5272,22 @@ function setupDirectRoutes(app) {
         spreadsheetId: SPREADSHEET_ID,
         range: SHEET_SETTINGS
       });
-      const settingsRows = (settingsRes.data.values || []).slice(1);
 
       // 통신사별 설정 필터링 및 업데이트/추가
-      const rowsToUpdate = [];
+      const findRowIdx = (settings, type) => {
+        const labels = {
+          'planGroup': ['planGroup', '요금제그룹', '요금제그룹핑'],
+          'support': ['support', '이통사지원금', '공시지원금'],
+          'policy': ['policy', '정책표', '리베이트']
+        }[type] || [type];
+        return settings.findIndex(row =>
+          (row[0] || '').trim() === carrier &&
+          labels.some(label => (row[1] || '').trim() === label)
+        );
+      };
 
       if (planGroup) {
-        const existingRowIndex = settingsRows.findIndex(
-          row => (row[0] || '').trim() === carrier && (row[1] || '').trim() === 'planGroup'
-        );
+        const existingRowIndex = findRowIdx(settingsRows, 'planGroup');
         const settingsJson = JSON.stringify({
           planNameRange: planGroup.planNameRange || '',
           planGroupRange: planGroup.planGroupRange || '',
@@ -5188,9 +5319,7 @@ function setupDirectRoutes(app) {
       }
 
       if (support) {
-        const existingRowIndex = settingsRows.findIndex(
-          row => (row[0] || '').trim() === carrier && (row[1] || '').trim() === 'support'
-        );
+        const existingRowIndex = findRowIdx(settingsRows, 'support');
         const settingsJson = JSON.stringify({
           modelRange: support.modelRange || '',
           petNameRange: support.petNameRange || '',
@@ -5221,9 +5350,7 @@ function setupDirectRoutes(app) {
       }
 
       if (policy) {
-        const existingRowIndex = settingsRows.findIndex(
-          row => (row[0] || '').trim() === carrier && (row[1] || '').trim() === 'policy'
-        );
+        const existingRowIndex = findRowIdx(settingsRows, 'policy');
         const settingsJson = JSON.stringify({
           modelRange: policy.modelRange || '',
           petNameRange: policy.petNameRange || '',
@@ -9239,6 +9366,7 @@ function setupDirectRoutes(app) {
   // === 매장별 슬라이드쇼 설정 관리 API ===
 
   // GET /api/direct/store-slideshow-settings?storeId=xxx: 매장별 슬라이드쇼 설정 조회 (캐싱 및 중복 요청 방지 적용)
+  // GET /api/direct/store-slideshow-settings?storeId=xxx: 매장별 슬라이드쇼 설정 조회 (캐싱 및 중복 요청 방지 적용)
   router.get('/store-slideshow-settings', async (req, res) => {
     try {
       const storeId = req.query.storeId;
@@ -9246,45 +9374,60 @@ function setupDirectRoutes(app) {
         return res.status(400).json({ success: false, error: '매장ID가 필요합니다.' });
       }
 
-      // 캐시 키 생성 (모든 매장 설정은 같은 시트에 있으므로 단일 키 사용 권장하지만, 
-      // 여기서는 전체 시트 데이터를 캐싱하여 필터링하는 방식을 사용)
+      // 캐시 키 생성
       const cacheKey = `store-settings-all`;
       const CACHE_TTL = 60 * 1000; // 1분 캐싱
 
-      // 중복 요청 방지 및 캐싱 적용
-      const allSettings = await withRequestDeduplication(cacheKey, async () => {
-        // 1. 캐시 확인
-        const cached = cacheManager.get(cacheKey);
-        if (cached) return cached;
+      let allSettings = [];
+      try {
+        // 중복 요청 방지 및 캐싱 적용
+        allSettings = await withRequestDeduplication(cacheKey, async () => {
+          // 1. 캐시 확인
+          const cached = cacheManager.get(cacheKey);
+          if (cached) return cached;
 
-        const { sheets, SPREADSHEET_ID } = createSheetsClient();
+          const { sheets, SPREADSHEET_ID } = createSheetsClient();
 
-        // 2. 시트 헤더 확인 (캐시된 경우 스킵됨)
-        await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
+          // 2. 시트 헤더 확인
+          await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
 
-        // 3. 데이터 조회 (Retry 적용)
-        const response = await withRetry(async () => {
-          return await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: `${SHEET_SETTINGS}!A:E`
+          // 3. 데이터 조회 (Retry 적용)
+          const response = await withRetry(async () => {
+            return await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${SHEET_SETTINGS}!A:E`
+            });
           });
+
+          // 데이터 안전성 검사
+          const rows = (response.data && response.data.values) ? response.data.values.slice(1) : [];
+
+          // 캐시 저장
+          cacheManager.set(cacheKey, rows, CACHE_TTL);
+          return rows;
         });
+      } catch (innerError) {
+        console.error('[Direct] store-slideshow-settings data fetch error:', innerError);
+        // 데이터 조회 실패 시에는 빈 배열로 처리 (500 에러 방지)
+        return res.status(500).json({ success: false, error: '설정 데이터 조회 실패', message: innerError.message });
+      }
 
-        const rows = (response.data.values || []).slice(1);
+      if (!allSettings || !Array.isArray(allSettings)) {
+        return res.json({ success: true, data: null });
+      }
 
-        // 캐시 저장
-        cacheManager.set(cacheKey, rows, CACHE_TTL);
-        return rows;
-      });
-
-      // 매장별 슬라이드쇼 설정 찾기 (메모리상에서 필터링)
+      // 매장별 슬라이드쇼 설정 찾기
       const storeSetting = allSettings.find(row => {
+        if (!row || row.length < 5) return false; // 행 데이터 유효성 검사
+
         const settingType = (row[1] || '').trim();
         const settingJson = (row[4] || '').trim();
+
         if (settingType === 'slideshowSettings') {
           try {
             const parsed = JSON.parse(settingJson);
-            return parsed.storeId === storeId;
+            // storeId 비교 (문자열 변환 후 비교)
+            return String(parsed.storeId) === String(storeId);
           } catch {
             return false;
           }
@@ -9296,7 +9439,8 @@ function setupDirectRoutes(app) {
         try {
           const settings = JSON.parse(storeSetting[4] || '{}');
           return res.json({ success: true, data: settings });
-        } catch {
+        } catch (parseError) {
+          console.error('[Direct] store-slideshow-settings JSON parse error:', parseError);
           return res.json({ success: true, data: null });
         }
       }
@@ -9778,69 +9922,86 @@ function setupDirectRoutes(app) {
         // Supabase에서 읽기 (DirectStoreDAL 사용)
         console.log(`📖 [GET /api/direct/transit-location/list] Supabase에서 데이터 읽기 시작`);
 
-        const DirectStoreDAL = require('./dal/DirectStoreDAL');
+        try {
+          const DirectStoreDAL = require('./dal/DirectStoreDAL');
 
-        // 모든 대중교통 위치 조회 - withRetrySupabase 적용
-        const allLocations = await withRetrySupabase(async () => {
-          return await DirectStoreDAL.getAllTransitLocations();
-        });
-        const locationMap = new Map();
-        allLocations.forEach(loc => {
-          locationMap.set(loc.id, {
-            id: loc.id,
-            type: loc.type,
-            name: loc.name,
-            address: loc.address,
-            lat: loc.latitude,
-            lng: loc.longitude,
-            updatedAt: loc.updatedAt
+          // 모든 대중교통 위치 조회 - withRetrySupabase 적용
+          const allLocations = await withRetrySupabase(async () => {
+            return await DirectStoreDAL.getAllTransitLocations();
           });
-        });
 
-        // 모든 매장의 대중교통 위치 조회 - withRetrySupabase 적용
-        const storePhotos = await withRetrySupabase(async () => {
-          return await DirectStoreDAL.dal.read('direct_store_photos');
-        });
-        const storeTransitData = [];
-
-        for (const row of storePhotos) {
-          const storeName = row['업체명'];
-          if (!storeName) continue;
-
-          let busTerminalIds = [];
-          let subwayStationIds = [];
-
-          try {
-            busTerminalIds = row['버스터미널ID목록'] ? JSON.parse(row['버스터미널ID목록']) : [];
-          } catch (e) {
-            console.warn(`[Direct] 버스터미널ID목록 JSON 파싱 실패 (${storeName}):`, e);
-          }
-
-          try {
-            subwayStationIds = row['지하철역ID목록'] ? JSON.parse(row['지하철역ID목록']) : [];
-          } catch (e) {
-            console.warn(`[Direct] 지하철역ID목록 JSON 파싱 실패 (${storeName}):`, e);
-          }
-
-          const busTerminals = busTerminalIds
-            .map(id => locationMap.get(id))
-            .filter(Boolean);
-          const subwayStations = subwayStationIds
-            .map(id => locationMap.get(id))
-            .filter(Boolean);
-
-          if (busTerminals.length > 0 || subwayStations.length > 0) {
-            storeTransitData.push({
-              storeName,
-              busTerminals,
-              subwayStations
+          if (allLocations && allLocations.length > 0) {
+            const locationMap = new Map();
+            allLocations.forEach(loc => {
+              locationMap.set(loc.id, {
+                id: loc.id,
+                type: loc.type,
+                name: loc.name,
+                address: loc.address,
+                lat: loc.latitude,
+                lng: loc.longitude,
+                updatedAt: loc.updatedAt
+              });
             });
+
+            // 모든 매장의 대중교통 위치 조회 - withRetrySupabase 적용
+            const storePhotos = await withRetrySupabase(async () => {
+              return await DirectStoreDAL.dal.read('direct_store_photos');
+            });
+
+            const storeTransitData = [];
+
+            for (const row of storePhotos) {
+              const storeName = row['업체명'];
+              if (!storeName) continue;
+
+              let busTerminalIds = [];
+              let subwayStationIds = [];
+
+              try {
+                busTerminalIds = row['버스터미널ID목록'] ? JSON.parse(row['버스터미널ID목록']) : [];
+              } catch (e) {
+                console.warn(`[Direct] 버스터미널ID목록 JSON 파싱 실패 (${storeName}):`, e);
+              }
+
+              try {
+                subwayStationIds = row['지하철역ID목록'] ? JSON.parse(row['지하철역ID목록']) : [];
+              } catch (e) {
+                console.warn(`[Direct] 지하철역ID목록 JSON 파싱 실패 (${storeName}):`, e);
+              }
+
+              const busTerminals = busTerminalIds
+                .map(id => locationMap.get(id))
+                .filter(Boolean);
+              const subwayStations = subwayStationIds
+                .map(id => locationMap.get(id))
+                .filter(Boolean);
+
+              if (busTerminals.length > 0 || subwayStations.length > 0) {
+                storeTransitData.push({
+                  storeName,
+                  busTerminals,
+                  subwayStations
+                });
+              }
+            }
+
+            console.log(`✅ [GET /api/direct/transit-location/list] Supabase에서 데이터 읽기 완료 (${storeTransitData.length}개 매장)`);
+
+            // 데이터가 있으면 바로 반환
+            if (storeTransitData.length > 0) {
+              return res.json({ success: true, data: storeTransitData });
+            } else {
+              console.warn(`⚠️ [GET /api/direct/transit-location/list] Supabase 데이터가 비어있어 Google Sheets로 폴백합니다.`);
+            }
+          } else {
+            console.warn(`⚠️ [GET /api/direct/transit-location/list] Supabase 대중교통 위치 데이터가 없어 Google Sheets로 폴백합니다.`);
           }
+
+        } catch (dbError) {
+          console.error(`🚨 [GET /api/direct/transit-location/list] Supabase 조회 중 에러 발생, Google Sheets로 폴백:`, dbError);
         }
-
-        console.log(`✅ [GET /api/direct/transit-location/list] Supabase에서 데이터 읽기 완료 (${storeTransitData.length}개 매장)`);
-
-        return res.json({ success: true, data: storeTransitData });
+        // 여기로 내려오면 Google Sheets 로직 실행
       }
 
       // Google Sheets에서 읽기 (기존 로직)

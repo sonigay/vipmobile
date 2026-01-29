@@ -25,6 +25,7 @@ class GoogleSheetsImplementation {
     this.sheetId = sheetId;
     this.credentials = credentials;
     this.doc = null;
+    this.initPromise = null; // 초기화 전용 Promise
     this.CACHE_TTL = 5 * 60 * 1000; // 5분 캐시
     this.pendingRequests = new Map(); // 진행 중인 요청(Promise) 저장소
   }
@@ -34,18 +35,34 @@ class GoogleSheetsImplementation {
    * @private
    */
   async initialize() {
-    if (!this.doc) {
+    // 1. 이미 초기화가 완료된 경우
+    if (this.doc && this.initPromise === 'COMPLETED') {
+      return;
+    }
+
+    // 2. 초기화가 진행 중인 경우, 기존 Promise를 기다림
+    if (this.initPromise instanceof Promise) {
+      return this.initPromise;
+    }
+
+    // 3. 새로 초기화 시작
+    this.initPromise = (async () => {
       try {
+        console.log(`[GoogleSheetsImplementation] Starting initialization for: ${this.sheetId}`);
         this.doc = new GoogleSpreadsheet(this.sheetId);
         await this.doc.useServiceAccountAuth(this.credentials);
         await this.doc.loadInfo();
         console.log(`[GoogleSheetsImplementation] Initialized: ${this.doc.title}`);
+        this.initPromise = 'COMPLETED'; // 성공 표시
       } catch (error) {
+        this.initPromise = null; // 실패 시 재시도 가능하도록 초기화
+        this.doc = null;
         console.error('[GoogleSheetsImplementation] Initialization failed:', error);
         throw new Error(`Failed to initialize Google Sheets: ${error.message}`);
       }
-    }
-    // 이미 초기화된 경우 재사용 (doc.loadInfo()를 매번 호출하지 않음)
+    })();
+
+    return this.initPromise;
   }
 
   /**

@@ -45,10 +45,10 @@ function createStoreRoutes(context) {
     const response = await rateLimiter.execute(() =>
       sheetsClient.sheets.spreadsheets.values.get({
         spreadsheetId: sheetsClient.SPREADSHEET_ID,
-        range: `${sheetName}!A:Z`
+        range: `${sheetName}!A:AZ`
       })
     );
-    
+
     return response.data.values || [];
   }
 
@@ -75,6 +75,12 @@ function createStoreRoutes(context) {
         throw new Error('Failed to fetch data from sheets');
       }
 
+      // 디버깅: 헤더 및 데이터 샘플 로깅 (인덱스 확인용)
+      if (storeValues.length > 0) {
+        console.log('📋 [StoreRoutes] Store Header:', storeValues[0]);
+        // console.log('📋 [StoreRoutes] First Row Sample:', storeValues[1]);
+      }
+
       // 헤더 제거 (첫 3행은 제외)
       const inventoryRows = inventoryValues.slice(3);
       const storeRows = storeValues.slice(1);
@@ -94,16 +100,16 @@ function createStoreRoutes(context) {
       inventoryRows.forEach((row) => {
         if (!row || row.length < 23) return; // 최소 O열까지 데이터가 있어야 함 (15+8)
 
-        const storeName = (row[21] || '').toString().trim();  // N열: 매장명 (13+8)
+        const storeName = (row[21] || '').toString().trim();  // N열: 매장명
         let cleanStoreName = storeName;
 
         // 모든 매장(사무실 포함)은 원래 이름 그대로 유지
         cleanStoreName = storeName;
-        const model = (row[13] || '').toString().trim();      // F열: 모델 (5+8)
-        const color = (row[14] || '').toString().trim();      // G열: 색상 (6+8)
-        const status = (row[15] || '').toString().trim();     // H열: 상태 (7+8)
-        const type = (row[12] || '').toString().trim();       // E열: 종류 (4+8)
-        const shippingDate = row[22] ? new Date(row[22]) : null;  // O열: 출고일 (14+8)
+        const model = (row[13] || '').toString().trim();      // F열: 모델
+        const color = (row[14] || '').toString().trim();      // G열: 색상
+        const status = (row[15] || '').toString().trim();     // H열: 상태
+        const type = (row[12] || '').toString().trim();       // E열: 종류
+        const shippingDate = row[22] ? new Date(row[22]) : null;  // O열: 출고일
 
         if (!storeName || !model || !color) return;
 
@@ -161,19 +167,19 @@ function createStoreRoutes(context) {
       // 매장 정보와 재고 정보 결합
       const stores = storeRows
         .filter(row => {
-          const name = (row[14] || '').toString().trim();  // G열: 업체명 (6+8)
-          const status = row[12];                          // M열: 거래상태 (12번째 컬럼)
+          const name = (row[14] || '').toString().trim();  // G열: 업체명 (실제 인덱스 14?) -> 로그 확인 후 보정 필요
+          const status = row[12];                          // M열: 거래상태
           return name && status === "사용";
         })
         .map(row => {
-          const latitude = parseFloat(row[8] || '0');    // I열: 위도 (8번째 컬럼)
-          const longitude = parseFloat(row[9] || '0');   // J열: 경도 (9번째 컬럼)
-          const name = row[14].toString().trim();        // G열: 업체명 (6+8)
-          const storeId = row[15];                        // H열: 매장 ID (7+8)
-          const phone = row[17] || '';                    // R열: 연락처 (17번째 컬럼)
-          const storePhone = row[22] || '';               // W열: 매장연락처 (22번째 컬럼)
-          const manager = row[21] || '';                  // V열: 담당자 (21번째 컬럼)
-          const address = (row[11] || '').toString();    // L열: 주소 (11번째 컬럼)
+          const latitude = parseFloat(row[8] || '0');    // I열: 위도 (8)
+          const longitude = parseFloat(row[9] || '0');   // J열: 경도 (9)
+          const name = row[14].toString().trim();        // G열: 업체명
+          const storeId = row[15];                        // H열: 매장 ID
+          const phone = row[17] || '';                    // R열: 연락처 (17)
+          const storePhone = row[22] || '';               // W열: 매장연락처 (22)
+          const manager = row[21] || '';                  // V열: 담당자 (21)
+          const address = (row[11] || '').toString();    // L열: 주소 (11)
 
           // 빈 매장 ID 제외
           if (!storeId || storeId.toString().trim() === '') {
@@ -181,10 +187,10 @@ function createStoreRoutes(context) {
           }
 
           const inventory = inventoryMap[name] || {};
-          const vipStatus = (row[18] || '').toString().trim(); // S열: 구분 (18번째 컬럼)
-          const businessNumber = (row[28] || '').toString().trim(); // AC열: 사업자번호 (28번째 컬럼)
-          const managerName = (row[29] || '').toString().trim(); // AD열: 점장명 (29번째 컬럼)
-          const accountInfo = (row[35] || '').toString().trim(); // AJ열: 계좌정보 (35번째 컬럼)
+          const vipStatus = (row[18] || '').toString().trim(); // S열: 구분 (18)
+          const businessNumber = (row[28] || '').toString().trim(); // AC열: 사업자번호 (28)
+          const managerName = (row[29] || '').toString().trim(); // AD열: 점장명 (29)
+          const accountInfo = (row[35] || '').toString().trim(); // AJ열: 계좌정보 (35)
 
           // 코드/사무실/소속/담당자 정보 추가 (필터링용)
           const code = (row[7] || '').toString().trim();        // H열(7인덱스): 코드
@@ -198,19 +204,19 @@ function createStoreRoutes(context) {
             address,
             phone,
             storePhone,
-            manager, // 기존 담당자 필드 유지 (V열, 21인덱스)
-            managerForFilter, // F열(5인덱스): 담당자 (필터링용)
-            managerName, // 점장명 추가
-            businessNumber,
-            accountInfo,
+            manager, // 기존 담당자 필드 유지
+            managerForFilter, // 필터용 담당자
+            managerName, // 점장명 (AD열)
+            businessNumber, // 사업자번호 (AC열)
+            accountInfo, // 계좌정보 (AJ열)
             vipStatus,
             latitude,
             longitude,
             uniqueId: `${storeId}_${name}`,
             inventory: inventory,
-            code,        // H열: 코드 (필터링용)
-            office,      // D열: 사무실 (필터링용)
-            department   // E열: 소속 (필터링용)
+            code,        // H열
+            office,      // D열
+            department   // E열
           };
         })
         .filter(store => store !== null); // null 값 제거
