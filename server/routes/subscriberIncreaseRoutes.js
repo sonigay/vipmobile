@@ -104,11 +104,18 @@ function createSubscriberIncreaseRoutes(context) {
       const subscriberTotals = {};
       const feeTotals = {};
 
+      const getNum = (val) => {
+        if (!val || val === '') return 0;
+        // 쉼표 제거 후 숫자로 변환
+        const cleaned = val.toString().replace(/,/g, '');
+        return parseFloat(cleaned) || 0;
+      };
+
       for (let i = 3; i < data.length; i++) {
         const row = data[i];
         const agentCode = row[0];
         const type = row[2];
-        const value = parseFloat((row[yearMonthIndex] || '').toString().replace(/,/g, '')) || 0;
+        const value = getNum(row[yearMonthIndex]); // Use getNum helper
 
         if (type === '가입자수') {
           subscriberTotals[agentCode] = (subscriberTotals[agentCode] || 0) + value;
@@ -144,6 +151,8 @@ function createSubscriberIncreaseRoutes(context) {
       if (!requireSheetsClient(res)) return;
       const { yearMonth, agentCode, type, value } = req.body;
 
+      console.log(`[SubscriberIncrease] 단일 저장 요청: month=${yearMonth}, agent=${agentCode}, type=${type}, val=${value}`);
+
       if (!yearMonth || !agentCode || !type || value === undefined) {
         return res.status(400).json({ success: false, error: '필수 데이터 누락' });
       }
@@ -153,13 +162,28 @@ function createSubscriberIncreaseRoutes(context) {
 
       const headers = existingData[0];
       const yearMonthIndex = headers.findIndex(h => h === yearMonth);
-      if (yearMonthIndex === -1) return res.status(400).json({ success: false, error: '년월 컬럼을 찾을 수 없음' });
+      if (yearMonthIndex === -1) {
+        console.error(`[SubscriberIncrease] 헤더를 찾을 수 없음: ${yearMonth}. 헤더 목록:`, headers);
+        return res.status(400).json({ success: false, error: '년월 컬럼을 찾을 수 없음' });
+      }
 
-      let targetRowIndex = existingData.findIndex((row, idx) => idx > 0 && row[0] === agentCode && row[2] === type);
-      if (targetRowIndex === -1) return res.status(404).json({ success: false, error: '행을 찾을 수 없음' });
+      let targetRowIndex = existingData.findIndex((row, idx) =>
+        idx > 0 &&
+        row[0]?.toString().trim() === agentCode?.toString().trim() &&
+        row[2]?.toString().trim() === type?.toString().trim()
+      );
+
+      if (targetRowIndex === -1) {
+        console.error(`[SubscriberIncrease] 행을 찾을 수 없음: agent=${agentCode}, type=${type}`);
+        return res.status(404).json({ success: false, error: '행을 찾을 수 없음' });
+      }
 
       const updatedRow = [...existingData[targetRowIndex]];
+      // 열 수 부족 시 확장
+      while (updatedRow.length <= yearMonthIndex) updatedRow.push('');
       updatedRow[yearMonthIndex] = value;
+
+      console.log(`[SubscriberIncrease] 업데이트 실행: Row=${targetRowIndex + 1}, Col=${yearMonthIndex + 1}, Value=${value}`);
 
       await rateLimiter.execute(() =>
         sheetsClient.sheets.spreadsheets.values.update({
@@ -174,6 +198,7 @@ function createSubscriberIncreaseRoutes(context) {
       cacheManager.deletePattern('subscriber_increase');
       res.json({ success: true });
     } catch (error) {
+      console.error('[SubscriberIncrease] 단일 저장 에러:', error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -182,8 +207,9 @@ function createSubscriberIncreaseRoutes(context) {
   router.post('/api/subscriber-increase/bulk-save', async (req, res) => {
     try {
       if (!requireSheetsClient(res)) return;
-      // bulkData 또는 data로 유연하게 받기
       const bulkData = req.body.bulkData || req.body.data;
+
+      console.log(`[SubscriberIncrease] 벌크 저장 요청: itemsCount=${bulkData?.length}`);
 
       if (!bulkData || !Array.isArray(bulkData) || bulkData.length === 0) {
         return res.status(400).json({ success: false, error: '저장할 데이터가 없습니다.' });
@@ -196,38 +222,59 @@ function createSubscriberIncreaseRoutes(context) {
       const headers = existingData[0];
       const updatedData = [...existingData];
       const affectedYearMonths = new Set();
+      let successCount = 0;
 
       // 2. 인메모리 데이터 업데이트
       for (const item of bulkData) {
         const { yearMonth, agentCode, type, value } = item;
-        const colIdx = headers.findIndex(h => h === yearMonth);
-        const rowIdx = existingData.findIndex((row, idx) => idx > 0 && row[0] === agentCode && row[2] === type);
+        const colIdx = headers.findIndex(h => h?.toString().trim() === yearMonth?.toString().trim());
+        const rowIdx = updatedData.findIndex((row, idx) =>
+          idx > 0 &&
+          row[0]?.toString().trim() === agentCode?.toString().trim() &&
+          row[2]?.toString().trim() === type?.toString().trim()
+        );
 
         if (colIdx !== -1 && rowIdx !== -1) {
+          // 열 수 부족 시 확장
+          while (updatedData[rowIdx].length <= colIdx) updatedData[rowIdx].push('');
           updatedData[rowIdx][colIdx] = value;
           affectedYearMonths.add(colIdx);
+          successCount++;
+        } else {
+          console.warn(`[SubscriberIncrease] 매칭 실패: month="${yearMonth}" (ColIdx=${colIdx}), agent="${agentCode}", type="${type}" (RowIdx=${rowIdx})`);
+          if (colIdx === -1) {
+            console.log('[SubscriberIncrease] 사용 가능한 헤더 예시:', headers.slice(0, 5));
+          }
         }
       }
 
-      // 3. 전체 시트 업데이트
-      await rateLimiter.execute(() =>
-        sheetsClient.sheets.spreadsheets.values.update({
-          spreadsheetId: sheetsClient.SPREADSHEET_ID,
-          range: '가입자증감!A:AA',
-          valueInputOption: 'RAW',
-          resource: { values: updatedData }
-        })
-      );
+      console.log(`[SubscriberIncrease] 업데이트 준비 완료: success=${successCount}/${bulkData.length}, affectedCols=${affectedYearMonths.size}`);
 
-      // 4. 영향받은 모든 월의 합계 재계산
-      for (const yearMonthIndex of affectedYearMonths) {
-        await calculateAndUpdateTotals(sheetsClient.SPREADSHEET_ID, '가입자증감', yearMonthIndex);
+      // 3. 전체 시트 업데이트
+      if (successCount > 0) {
+        await rateLimiter.execute(() =>
+          sheetsClient.sheets.spreadsheets.values.update({
+            spreadsheetId: sheetsClient.SPREADSHEET_ID,
+            range: '가입자증감!A:AA',
+            valueInputOption: 'RAW',
+            resource: { values: updatedData }
+          })
+        );
+
+        // 4. 영향받은 모든 월의 합계 재계산
+        for (const yearMonthIndex of affectedYearMonths) {
+          await calculateAndUpdateTotals(sheetsClient.SPREADSHEET_ID, '가입자증감', yearMonthIndex);
+        }
       }
 
       cacheManager.deletePattern('subscriber_increase');
-      res.json({ success: true, count: bulkData.length });
+      res.json({
+        success: true,
+        results: { successCount: successCount },
+        total: bulkData.length
+      });
     } catch (error) {
-      console.error('Error bulk saving subscriber increase data:', error);
+      console.error('[SubscriberIncrease] 벌크 저장 에러:', error);
       res.status(500).json({ success: false, error: error.message });
     }
   });

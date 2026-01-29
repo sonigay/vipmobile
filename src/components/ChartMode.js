@@ -3939,7 +3939,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
         credentials: 'include'
       });
 
-      console.log('🔍 [가입자증감] 권한 확인 응답 상태:', response.status);
+      // console.log('🔍 [가입자증감] 권한 확인 응답 상태:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -3948,7 +3948,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
       }
 
       const result = await response.json();
-      console.log('🔍 [가입자증감] 권한 확인 결과:', result);
+      // console.log('🔍 [가입자증감] 권한 확인 결과:', result);
       setHasPermission(result.hasAccess);
       return result.hasAccess;
     } catch (error) {
@@ -3968,7 +3968,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
         credentials: 'include'
       });
 
-      console.log('🔍 [가입자증감] 시트 초기화 응답 상태:', response.status);
+      // console.log('🔍 [가입자증감] 시트 초기화 응답 상태:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -3977,10 +3977,12 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
       }
 
       const result = await response.json();
+      /*
       console.log('🔍 [가입자증감] 시트 초기화 결과:', result);
       console.log('🔍 [가입자증감] 시트 초기화 성공 여부:', result.success);
       console.log('🔍 [가입자증감] 시트 초기화 데이터:', result.data);
       console.log('🔍 [가입자증감] 시트 초기화 데이터 길이:', result.data ? result.data.length : 'null');
+      */
 
       if (result.success) {
         setData(result.data);
@@ -4010,17 +4012,19 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
         }
       );
 
-      console.log('🔍 [가입자증감] 데이터 조회 응답 상태:', response.status);
+      // console.log('🔍 [가입자증감] 데이터 조회 응답 상태:', response.status);
 
       const result = await response.json();
+      /*
       console.log('🔍 [가입자증감] 데이터 조회 결과:', result);
       console.log('🔍 [가입자증감] 데이터 조회 성공 여부:', result.success);
       console.log('🔍 [가입자증감] 데이터 조회 데이터:', result.data);
       console.log('🔍 [가입자증감] 데이터 조회 데이터 길이:', result.data ? result.data.length : 'null');
+      */
 
       if (result.success) {
-        console.log('🔍 [가입자증감] 로드된 데이터 확인:', result.data);
-        console.log('🔍 [가입자증감] 315835(제외) 행 찾기:', result.data.filter(row => row[0] === '315835(제외)'));
+        // console.log('🔍 [가입자증감] 로드된 데이터 확인:', result.data);
+        // console.log('🔍 [가입자증감] 315835(제외) 행 찾기:', result.data.filter(row => row[0] === '315835(제외)'));
         setData(result.data);
         setError(null); // 성공 시 오류 메시지 초기화
         return result.data;
@@ -4100,7 +4104,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
       setError(null);
 
       try {
-        console.log('🔍 [가입자증감] 컴포넌트 초기화 시작', { presentationMode });
+        // console.log('🔍 [가입자증감] 컴포넌트 초기화 시작', { presentationMode });
 
         // presentationMode일 때는 권한 확인을 건너뛰고 바로 데이터 로드
         if (!presentationMode) {
@@ -4154,7 +4158,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
               }
             }
             setSelectedYearMonth(initialYearOrYearMonth);
-            console.log('🔍 [가입자증감] 기본 년월/년도 설정:', initialYearOrYearMonth);
+            // console.log('🔍 [가입자증감] 기본 년월/년도 설정:', initialYearOrYearMonth);
           }
         } else {
           console.error('🔍 [가입자증감] 데이터 로드 실패');
@@ -4213,9 +4217,11 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
             const value = row[colIndex];
             const numValue = parseFloat(value) || 0;
             total += numValue;
+            /*
             if (numValue !== 0) {
               console.log(`🔍 [가입자증감] ${targetType} 합계 계산: ${row[0]} ${yearMonthKey} = ${numValue} (총합: ${total})`);
             }
+            */
           }
         }
       });
@@ -4649,7 +4655,7 @@ function SubscriberIncreaseTab({ presentationMode = false, detailOptions }) {
       const feeRow = data.find(row => row[0] === code && row[2] === '관리수수료');
 
       if (subscriberRow && feeRow) {
-        console.log(`🔍 [가입자증감] ${code} 행 처리:`, { subscriberRow, feeRow });
+        // console.log(`🔍 [가입자증감] ${code} 행 처리:`, { subscriberRow, feeRow });
         agents.push({
           code: code,
           displayCode: code,
