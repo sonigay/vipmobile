@@ -237,12 +237,8 @@ const createStructuralPolicyRoutes = (context) => {
 
                 const lowCostModels = ['LM-Y110L', 'LM-Y120L', 'SM-G160N', 'AT-M120', 'AT-M120B', 'AT-M140L'];
                 const excludedPlanKeywords = ["키즈", "청소년", "시니어", "태블릿", "스마트기기", "Wearable", "현역병사"];
-                let debugCount = 0;
 
                 manualRows.forEach(row => {
-                    if (debugCount < 5) {
-                        console.log(`[Row DEBUG] Length: ${row.length}, Index 99 (PlanGroup): '${row[99]}', Index 98 (ModelType): '${row[98]}'`);
-                    }
                     const curMgr = (row[idx.manager] || '').toString().trim();
                     if (manager !== 'TOTAL' && curMgr !== manager) return;
 
