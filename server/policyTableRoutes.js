@@ -1091,7 +1091,7 @@ function getJobStatus(jobId) {
 const generationQueue = {
   queue: [], // 대기 중인 작업 목록 { jobId, userId, userName, policyTableName, createdAt, queuePosition }
   processing: [], // 처리 중인 작업 목록 { jobId, userId, userName, policyTableName, startedAt, discordRequestId }
-  maxConcurrent: 1, // 동시에 처리할 수 있는 최대 작업 수 (디스코드 봇이 한 번에 하나만 처리)
+  maxConcurrent: 2, // 동시에 처리할 수 있는 최대 작업 수 (1 -> 2로 증가)
   discordBotStatus: {
     isAvailable: true, // 디스코드 봇 사용 가능 여부
     lastResponseTime: null, // 마지막 응답 시간 (ms)
@@ -1101,6 +1101,41 @@ const generationQueue = {
   },
   userActiveJobs: new Map() // 사용자별 활성 작업 추적 { userId: Set<jobId> }
 };
+
+const JOB_TIMEOUT_MS = 5 * 60 * 1000; // 5분 (타임아웃)
+
+// 타임아웃된 작업 정리 (Stale Job Cleaner)
+function cleanStaleJobs() {
+  const now = Date.now();
+  const staleJobs = generationQueue.processing.filter(job => {
+    const startTime = new Date(job.startedAt).getTime();
+    return (now - startTime) > JOB_TIMEOUT_MS;
+  });
+
+  if (staleJobs.length > 0) {
+    console.warn(`🧹 [큐] 타임아웃된 작업 ${staleJobs.length}개 정리 시작`);
+    staleJobs.forEach(job => {
+      console.error(`❌ [큐] 작업 타임아웃(강제 종료): ${job.jobId} (${job.policyTableName})`);
+
+      // 처리 중 목록에서 제거 (이 함수 내부에서 activeRequests 감소 등 처리됨)
+      removeFromProcessing(job.jobId);
+
+      // 상태 실패로 업데이트
+      updateJobStatus(job.jobId, {
+        status: 'failed',
+        progress: 0,
+        message: '작업 시간 초과 (5분 경과, 시스템 자동 종료)',
+        error: 'Timeout: Job took too long to complete'
+      });
+    });
+
+    // 대기 중인 다음 작업 실행 시도
+    processQueue();
+  }
+}
+
+// 1분마다 타임아웃 체크
+setInterval(cleanStaleJobs, 60 * 1000);
 
 // 큐에 작업 추가
 function addToQueue(jobId, userId, userName, policyTableName) {
