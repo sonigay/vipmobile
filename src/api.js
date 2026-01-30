@@ -123,9 +123,14 @@ export const api = {
     return response.json();
   },
   // 월간시상 데이터 가져오기
-  getMonthlyAwardData: async () => {
+  getMonthlyAwardData: async (options = {}) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/monthly-award/data`, {
+      const { refresh } = options;
+      const queryParams = new URLSearchParams();
+      if (refresh) queryParams.append('refresh', 'true');
+      const url = `${API_BASE_URL}/api/monthly-award/data${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

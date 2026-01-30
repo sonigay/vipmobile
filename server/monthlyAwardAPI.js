@@ -93,8 +93,11 @@ module.exports = function createMonthlyAwardRoutes(context) {
   // 월간시상 데이터 계산 API
   async function getMonthlyAwardData(req, res) {
     try {
-      console.log('월간시상 데이터 구글시트에서 로드');
-      invalidateCache();
+      // console.log('월간시상 데이터 구글시트에서 로드'); // Removed verbose log
+      if (req.query.refresh === 'true') {
+        console.log('🔄 [MonthlyAward] Forcing cache refresh via query param');
+        invalidateCache();
+      }
 
       const availableSheets = await debugSheetNames();
       const requiredSheets = [

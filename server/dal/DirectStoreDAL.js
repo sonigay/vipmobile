@@ -1244,25 +1244,7 @@ class DirectStoreDAL {
     }
   }
 
-  /**
-   * 링크 설정 삭제
-   * @param {string} carrier - 통신사 (SK, KT, LG)
-   * @param {string} settingType - 설정 유형 (policy, support, planGroup 등)
-   * @returns {Promise<Object>} { success: true }
-   */
-  async deleteLinkSettings(carrier, settingType) {
-    try {
-      await this.dal.delete('direct_store_settings', {
-        '통신사': carrier,
-        '설정유형': settingType
-      });
-      console.log(`[DirectStoreDAL] 링크 설정 삭제 완료: ${carrier} - ${settingType}`);
-      return { success: true };
-    } catch (error) {
-      console.error('[DirectStoreDAL] 링크 설정 삭제 실패:', error);
-      throw error;
-    }
-  }
+
 
   /**
    * 메인 페이지 문구 삭제
@@ -1690,6 +1672,93 @@ class DirectStoreDAL {
       return { success: true, data };
     } catch (error) {
       console.error('[DirectStoreDAL] 링크 설정 저장 실패:', error);
+      throw error;
+    }
+  }
+
+
+  /**
+   * 링크 설정 조회 (Supabase)
+   * @param {string} carrier - 통신사
+   */
+  async getSettings(carrier) {
+    try {
+      const { data, error } = await supabase
+        .from('direct_store_settings')
+        .select('*')
+        .eq('통신사', carrier);
+
+      if (error) throw error;
+
+      // DB 컬럼을 프론트엔드/API 예상 포맷으로 매핑
+      return data.map(item => ({
+        carrier: item.통신사,
+        settingType: item.설정유형,
+        sheetId: item.시트ID,
+        sheetUrl: item.시트URL,
+        settings: item.설정값JSON ? JSON.parse(item.설정값JSON) : {}
+      }));
+    } catch (error) {
+      console.error('[DirectStoreDAL] 링크 설정 조회 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 메인 페이지 문구 조회 (Supabase)
+   */
+  async getMainPageTexts() {
+    try {
+      const { data, error } = await supabase
+        .from('direct_store_main_page_texts')
+        .select('*');
+
+      if (error) throw error;
+
+      return data.map(item => ({
+        carrier: item.통신사,
+        category: item.카테고리,
+        type: item.설정유형,
+        content: item.문구내용,
+        imageUrl: item.이미지URL,
+        updatedAt: item.수정일시
+      }));
+    } catch (error) {
+      console.error('[DirectStoreDAL] 메인 페이지 문구 조회 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 메인 페이지 문구 업데이트 (Supabase)
+   */
+  async updateMainPageText(carrier, category, textType, data) {
+    try {
+      const record = {
+        '통신사': carrier || '',
+        '카테고리': category || '',
+        '설정유형': textType,
+        '문구내용': data.content || '',
+        '이미지URL': data.imageUrl || '',
+        '수정일시': new Date().toISOString()
+      };
+
+      // Upsert: 통신사+카테고리+설정유형 복합 키로 유니크 제약이 있다고 가정
+      // 만약 복합 키가 없다면 delete/insert 방식 사용
+      // 여기서는 delete -> insert 방식 사용 (안전하게)
+
+      const filters = {
+        '통신사': carrier || '',
+        '카테고리': category || '',
+        '설정유형': textType
+      };
+
+      await this.dal.delete('direct_store_main_page_texts', filters);
+      await this.dal.create('direct_store_main_page_texts', record);
+
+      return { success: true };
+    } catch (error) {
+      console.error('[DirectStoreDAL] 메인 페이지 문구 업데이트 실패:', error);
       throw error;
     }
   }

@@ -68,7 +68,12 @@ const createStructuralPolicyRoutes = (context) => {
     };
 
     // 설정 시트 존재 여부 확인 및 자동 생성
-    const ensureSettingsSheet = async () => {
+    // 메모리에 체크 여부 저장 (서버 재시작 시 초기화됨)
+    let settingsSheetChecked = false;
+
+    const ensureSettingsSheet = async (forceCheck = false) => {
+        if (settingsSheetChecked && !forceCheck) return;
+
         try {
             const response = await sheets.spreadsheets.get({
                 spreadsheetId: SPREADSHEET_ID
@@ -112,6 +117,7 @@ const createStructuralPolicyRoutes = (context) => {
                 });
                 console.log(`[StructuralPolicy] ${STRUCTURAL_POLICY_SETTINGS_SHEET_NAME} created with initial data.`);
             }
+            settingsSheetChecked = true;
         } catch (error) {
             console.error('[StructuralPolicy] Error ensuring settings sheet:', error.message);
         }

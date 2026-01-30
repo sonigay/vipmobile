@@ -85,10 +85,11 @@ const StructuralPolicyTab = () => {
     const [isCodeExpanded, setIsCodeExpanded] = useState(true);
     const [isAgentExpanded, setIsAgentExpanded] = useState(true);
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (forceRefresh = false) => {
         setLoading(true);
         try {
-            const response = await fetchWithRetry(`${API_BASE_URL}/api/structural-policy/data`);
+            const url = `${API_BASE_URL}/api/structural-policy/data${forceRefresh ? '?refresh=true' : ''}`;
+            const response = await fetchWithRetry(url);
             const result = await response.json();
             setData(result);
             setLastUpdate(result.lastUpdate);
@@ -453,7 +454,7 @@ const StructuralPolicyTab = () => {
                         )}
                     </Grid>
                     <Grid item xs={12} md={6} sx={{ textAlign: 'right' }}>
-                        <Button variant="contained" startIcon={<RefreshIcon />} onClick={fetchData} sx={{ mr: 1, backgroundColor: 'rgba(255,255,255,0.2)' }}>새로고침</Button>
+                        <Button variant="contained" startIcon={<RefreshIcon />} onClick={() => fetchData(true)} sx={{ mr: 1, backgroundColor: 'rgba(255,255,255,0.2)' }}>새로고침</Button>
                         <Button variant="contained" startIcon={<SettingsIcon />} onClick={() => setShowSettings(true)} sx={{ mr: 1, backgroundColor: 'rgba(255,255,255,0.2)' }}>셋팅</Button>
                         <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint} sx={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>인쇄</Button>
                     </Grid>

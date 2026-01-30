@@ -13,9 +13,13 @@ import {
     Alert,
     CircularProgress,
     Grid,
-    Collapse
+    Grid,
+    Collapse,
+    IconButton,
+    Tooltip
 } from '@mui/material';
 import {
+    Refresh as RefreshIcon,
     Close as CloseIcon,
     ExpandMore as ExpandMoreIcon,
     Edit as EditIcon,
@@ -37,16 +41,20 @@ export default function MonthlyAwardTab() {
     const [showSettings, setShowSettings] = useState(false);
 
     // 데이터 로드
-    const loadData = async () => {
+    const loadData = async (forceRefresh = false) => {
         try {
             setLoading(true);
-            const result = await api.getMonthlyAwardData();
+            const result = await api.getMonthlyAwardData({ refresh: forceRefresh });
             setData(result);
         } catch (err) {
             setError(err.message);
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleRefresh = () => {
+        loadData(true);
     };
 
     useEffect(() => {
@@ -336,6 +344,15 @@ export default function MonthlyAwardTab() {
                                 </Button>
                                 <Button
                                     variant="outlined"
+                                    size="small"
+                                    onClick={handleRefresh}
+                                    startIcon={<RefreshIcon />}
+                                    sx={{ mr: 1, display: { print: 'none' } }}
+                                >
+                                    새로고침
+                                </Button>
+                                <Button
+                                    variant="contained"
                                     size="small"
                                     onClick={handlePrint}
                                     startIcon={<PrintIcon />}
