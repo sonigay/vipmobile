@@ -982,11 +982,40 @@ async function rebuildDeviceMaster(carriersParam) {
     }
 
     // 3. 실제 모델 데이터 읽기
-    // Rate Limit 방지를 위해 순차 처리로 변경 (Promise.all 대신)
-    const models = await getSheetData(sheetId, modelRange);
-    const petNames = petNameRange ? await getSheetData(sheetId, petNameRange) : [];
-    const makers = makerRange ? await getSheetData(sheetId, makerRange) : []; // 제조사 범위가 있다면
-    const prices = factoryPriceRange ? await getSheetData(sheetId, factoryPriceRange) : [];
+    // 🔥 성능 개선: Batch Get 사용 (1번의 API 호출로 4개 범위 조회)
+    let models = [], petNames = [], makers = [], prices = [];
+    const rangesToFetch = [];
+
+    // 범위가 있는 경우만 요청 목록에 추가
+    if (modelRange) rangesToFetch.push(modelRange);
+    if (petNameRange) rangesToFetch.push(petNameRange);
+    if (makerRange) rangesToFetch.push(makerRange);
+    if (factoryPriceRange) rangesToFetch.push(factoryPriceRange);
+
+    if (rangesToFetch.length > 0) {
+      try {
+        const batchRes = await withRetry(async () => {
+          return await sheets.spreadsheets.values.batchGet({
+            spreadsheetId: sheetId,
+            ranges: rangesToFetch,
+            majorDimension: 'ROWS',
+            valueRenderOption: 'UNFORMATTED_VALUE'
+          });
+        });
+
+        const valueRanges = batchRes.data.valueRanges || [];
+
+        // 결과 매핑 (요청 순서대로)
+        let responseIndex = 0;
+        if (modelRange) models = valueRanges[responseIndex++]?.values || [];
+        if (petNameRange) petNames = valueRanges[responseIndex++]?.values || [];
+        if (makerRange) makers = valueRanges[responseIndex++]?.values || [];
+        if (factoryPriceRange) prices = valueRanges[responseIndex++]?.values || [];
+      } catch (err) {
+        console.warn(`[Direct] ${carrier} 모델 데이터 Batch Get 실패:`, err.message);
+        // 실패 시 개별 조회 시도하지 않고 빈 배열 처리 (또는 필요시 개별 조회 폴백 로직 추가 가능)
+      }
+    }
 
     const flatModels = models.flat().map(v => (v || '').toString().trim());
     const flatPets = petNames.flat().map(v => (v || '').toString().trim());
