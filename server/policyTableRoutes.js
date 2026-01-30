@@ -16,20 +16,20 @@ if (DISCORD_LOGGING_ENABLED && DISCORD_BOT_TOKEN) {
   // 비동기로 초기화하여 서버 시작을 블로킹하지 않음
   setImmediate(() => {
     try {
-  discordBot = new Client({
-    intents: [
-      GatewayIntentBits.Guilds,
-      GatewayIntentBits.GuildMessages,
-      GatewayIntentBits.MessageContent
-    ]
-  });
+      discordBot = new Client({
+        intents: [
+          GatewayIntentBits.Guilds,
+          GatewayIntentBits.GuildMessages,
+          GatewayIntentBits.MessageContent
+        ]
+      });
 
-  discordBot.once('ready', () => {
-    console.log(`✅ [정책표] Discord 봇이 준비되었습니다: ${discordBot.user.tag}`);
-  });
+      discordBot.once('ready', () => {
+        console.log(`✅ [정책표] Discord 봇이 준비되었습니다: ${discordBot.user.tag}`);
+      });
 
-  discordBot.login(DISCORD_BOT_TOKEN)
-    .then(() => console.log('✅ [정책표] Discord 봇 로그인 성공'))
+      discordBot.login(DISCORD_BOT_TOKEN)
+        .then(() => console.log('✅ [정책표] Discord 봇 로그인 성공'))
         .catch(error => {
           console.error('❌ [정책표] Discord 봇 로그인 실패:', error.message);
           discordBot = null; // 실패 시 null로 설정
@@ -114,7 +114,7 @@ async function getCreatorPermissionName(creatorPermissions) {
 
   try {
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
-    
+
     // 대리점아이디관리 시트 조회 (캐싱 적용)
     const response = await getAgentManagementData(sheets, SPREADSHEET_ID);
 
@@ -162,7 +162,7 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
 
     // 생성자적용권한 이름 가져오기
     const creatorPermissionName = await getCreatorPermissionName(creatorPermissions);
-    
+
     // 포스트 이름 생성 (포럼 채널용): 정책표이름-생성자적용권한사람이름-실행한사람이름
     const postName = `${policyTableName}-${creatorPermissionName}-${userName}`;
     let targetChannel = channel; // 실제로 메시지를 보낼 채널/포스트
@@ -170,10 +170,10 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
     // 포럼 채널인지 확인
     if (channel.type === ChannelType.GuildForum) {
       console.log(`📋 포럼 채널 감지: ${channelId}, 포스트 찾기/생성: ${postName}`);
-      
+
       // 활성 포스트 가져오기
       const activeThreads = await channel.threads.fetchActive();
-      
+
       // 기존 포스트 찾기
       let post = Array.from(activeThreads.threads.values()).find(
         thread => thread.name === postName
@@ -186,7 +186,7 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
           post = Array.from(archivedThreads.threads.values()).find(
             thread => thread.name === postName
           );
-          
+
           if (post) {
             // 아카이브된 포스트를 활성화
             await post.setArchived(false);
@@ -234,7 +234,7 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
     }
     console.log(`📤 [${requestId}] 디스코드 명령어 전송: ${command.substring(0, 100)}...`);
     console.log(`📤 [${requestId}] 정책표: ${policyTableName}, URL: ${sheetUrl.substring(0, 50)}...`);
-    
+
     // 명령어 메시지 전송 (포스트 또는 일반 채널)
     const commandMessage = await targetChannel.send(command);
     const commandMessageId = commandMessage.id;
@@ -267,7 +267,7 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
       const isTargetChannel = msg.channel.id === targetChannel.id;
       const isNotCloudBot = msg.author.id !== CLOUD_BOT_ID; // 클라우드 서버 봇이 아닌 메시지만
       const isCompleteSignal = msg.content && msg.content.startsWith('!screenshot-complete');
-      
+
       // 완료 신호 파싱
       let commandIdMatch = null;
       let imageIdMatch = null;
@@ -287,11 +287,11 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
       const isLocalBot = LOCAL_BOT_ID ? msg.author.id === LOCAL_BOT_ID : true;
 
       const matches = isTargetChannel &&
-                     isNotCloudBot &&
-                     isCompleteSignal &&
-                     isMatchingCommand &&
-                     hasImageId &&
-                     isLocalBot;
+        isNotCloudBot &&
+        isCompleteSignal &&
+        isMatchingCommand &&
+        hasImageId &&
+        isLocalBot;
 
       if (isTargetChannel && isCompleteSignal) {
         console.log(`🔍 [정책표] 완료 신호 필터링:`, {
@@ -360,7 +360,7 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
             try {
               excelMessageId = excelIdMatch[1];
               console.log(`🔍 [정책표] 엑셀 파일 메시지 ID 추출: ${excelMessageId}`);
-              
+
               const excelMessage = await targetChannel.messages.fetch(excelMessageId);
               if (excelMessage) {
                 const excelAttachment = excelMessage.attachments.first();
@@ -410,7 +410,7 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
             timestamp: msg.createdTimestamp
           }))
         });
-        
+
         if (collected.size === 0) {
           console.error(`❌ [정책표] 완료 신호 수집 실패: 120초 동안 완료 신호를 받지 못했습니다.`);
           console.error(`   타겟 채널/포스트 ID: ${targetChannel.id}`);
@@ -575,15 +575,15 @@ const HEADERS_GROUP_CHANGE_HISTORY = [
 // 시트 ID만 넣어도, 전체 URL을 넣어도 편집 가능한 표준 URL로 변환
 function normalizeGoogleSheetEditLink(link) {
   if (!link) return '';
-  
+
   // 공백 제거
   link = link.trim();
-  
+
   // 시트 ID만 있는 경우 (예: "1Vy8Qhce3B6_41TxRfVUs883ioLxiGTUjkbD_nKebgrs")
   if (/^[a-zA-Z0-9-_]+$/.test(link)) {
     return `https://docs.google.com/spreadsheets/d/${link}/edit`;
   }
-  
+
   // 이미 전체 URL인 경우
   if (link.startsWith('http://') || link.startsWith('https://')) {
     // 시트 ID 추출
@@ -599,7 +599,7 @@ function normalizeGoogleSheetEditLink(link) {
       return `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
     }
   }
-  
+
   // 변환 실패 시 원본 반환
   return link;
 }
@@ -673,7 +673,7 @@ function invalidateCache(pattern) {
 
 // 관련 캐시를 한 번에 무효화하는 헬퍼 함수
 function invalidateRelatedCaches(type, id = null) {
-  switch(type) {
+  switch (type) {
     case 'user-group':
       // 정책영업그룹 변경 시 관련된 모든 캐시 무효화
       invalidateCache('user-groups');
@@ -706,7 +706,7 @@ async function processSheetsRequestQueue() {
   if (sheetsRequestQueue.length > 0 && currentSheetsRequests < MAX_CONCURRENT_SHEETS_REQUESTS) {
     const { resolve, reject, fn } = sheetsRequestQueue.shift();
     currentSheetsRequests++;
-    
+
     try {
       const result = await fn();
       resolve(result);
@@ -809,7 +809,7 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
     });
     const firstRow = res.data.values && res.data.values[0] ? res.data.values[0] : [];
     const needsInit = firstRow.length === 0 || headers.some((h, i) => (firstRow[i] || '') !== h) || firstRow.length < headers.length;
-    
+
     if (needsInit) {
       await withRetry(async () => {
         const lastColumn = getColumnLetter(headers.length);
@@ -823,7 +823,7 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
       cacheStore.delete(cacheKey);
       return headers;
     }
-    
+
     setCache(cacheKey, headers, CACHE_TTL.SHEET_HEADERS);
     return headers;
   } catch (error) {
@@ -859,7 +859,7 @@ async function getPolicySheetUrl(originalUrl, isPublicLink = true) {
     }
 
     const { sheets } = createSheetsClient();
-    
+
     // 시트 목록 조회
     const spreadsheet = await withRetry(async () => {
       return await sheets.spreadsheets.get({ spreadsheetId });
@@ -905,7 +905,7 @@ async function getPolicySheetUrl(originalUrl, isPublicLink = true) {
 async function getAgentManagementData(sheets, SPREADSHEET_ID) {
   const agentSheetName = '대리점아이디관리';
   const cacheKey = `agent-management-${SPREADSHEET_ID}`;
-  
+
   // 캐시 확인
   const cached = getCache(cacheKey);
   if (cached) {
@@ -917,11 +917,11 @@ async function getAgentManagementData(sheets, SPREADSHEET_ID) {
   let response;
   try {
     response = await withRetry(async () => {
-    return await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${agentSheetName}!A:Z`
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${agentSheetName}!A:Z`
+      });
     });
-  });
   } catch (err) {
     // rate limit 등으로 실패 시 마지막 성공 데이터라도 반환
     const isRateLimitError =
@@ -955,7 +955,7 @@ async function getAgentManagementData(sheets, SPREADSHEET_ID) {
 async function checkPermission(req, allowedRoles, mode = 'policy') {
   try {
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
-    
+
     // 대리점아이디관리 시트에서 사용자 정보 조회 (캐싱 적용)
     const response = await getAgentManagementData(sheets, SPREADSHEET_ID);
 
@@ -965,105 +965,105 @@ async function checkPermission(req, allowedRoles, mode = 'policy') {
       return { hasPermission: false, error: '대리점아이디관리 시트 조회 실패' };
     }
 
-  const rows = response.data.values || [];
-  if (rows.length < 2) {
+    const rows = response.data.values || [];
+    if (rows.length < 2) {
       console.warn(`[${mode === 'budget' ? '예산' : '정책'}표] 권한 체크: 대리점아이디관리 시트에 데이터가 없습니다.`);
       return { hasPermission: false, error: '대리점아이디관리 시트에 데이터가 없습니다.' };
     }
 
-  // 로그인한 사용자 정보 찾기 (헤더에서 가져오기)
-  const userId = req.headers['x-user-id'] || req.body?.userId || req.query?.userId;
-  const userRole = req.headers['x-user-role'] || req.body?.userRole || req.query?.userRole;
-  
-  // 대리점아이디관리 시트에서 사용자 정보 찾기
-  // C열(2번 인덱스): 연락처(아이디) = contactId
-  // A열(0번 인덱스): 대상(이름)
-  // 정책모드: 접근권한 11인덱스, 권한레벨 17인덱스
-  // 예산모드: 접근권한 18인덱스, 권한레벨 19인덱스
-  const roleIndex = mode === 'budget' ? 19 : 17; // 예산모드는 19, 정책모드는 17
-  const accessPermissionIndex = mode === 'budget' ? 18 : 11; // 예산모드는 18, 정책모드는 11
-  let userInfo = null;
-  if (userId) {
-    const userRow = rows.find(row => {
-      // C열(2번 인덱스)에서 contactId로 찾기
-      return row[2] === userId;
+    // 로그인한 사용자 정보 찾기 (헤더에서 가져오기)
+    const userId = req.headers['x-user-id'] || req.body?.userId || req.query?.userId;
+    const userRole = req.headers['x-user-role'] || req.body?.userRole || req.query?.userRole;
+
+    // 대리점아이디관리 시트에서 사용자 정보 찾기
+    // C열(2번 인덱스): 연락처(아이디) = contactId
+    // A열(0번 인덱스): 대상(이름)
+    // 정책모드: 접근권한 11인덱스, 권한레벨 17인덱스
+    // 예산모드: 접근권한 18인덱스, 권한레벨 19인덱스
+    const roleIndex = mode === 'budget' ? 19 : 17; // 예산모드는 19, 정책모드는 17
+    const accessPermissionIndex = mode === 'budget' ? 18 : 11; // 예산모드는 18, 정책모드는 11
+    let userInfo = null;
+    if (userId) {
+      const userRow = rows.find(row => {
+        // C열(2번 인덱스)에서 contactId로 찾기
+        return row[2] === userId;
+      });
+      if (userRow) {
+        userInfo = {
+          id: userRow[2] || userId,      // C열: 연락처(아이디)
+          name: userRow[0] || userId,    // A열: 대상(이름)
+          role: userRow[roleIndex] || userRole,  // 권한레벨 (모드에 따라 인덱스 다름)
+          accessPermission: userRow[accessPermissionIndex] || ''  // 접근권한 (모드에 따라 인덱스 다름)
+        };
+      }
+    }
+
+    // userRole이 없으면 userInfo에서 가져오기
+    const finalUserRole = userRole || userInfo?.role;
+    const finalUserId = userId || userInfo?.id;
+    // 이름은 반드시 userInfo에서 가져오기 (아이디가 아닌 이름)
+    const finalUserName = userInfo?.name || null;
+
+    // 디버깅 로그
+    console.log('[정책표] 권한 체크:', {
+      userId: userId,
+      userRole: userRole,
+      finalUserRole: finalUserRole,
+      finalUserId: finalUserId,
+      finalUserName: finalUserName,
+      userInfo: userInfo ? { id: userInfo.id, name: userInfo.name, role: userInfo.role } : null,
+      allowedRoles: allowedRoles
     });
-    if (userRow) {
-      userInfo = {
-        id: userRow[2] || userId,      // C열: 연락처(아이디)
-        name: userRow[0] || userId,    // A열: 대상(이름)
-        role: userRow[roleIndex] || userRole,  // 권한레벨 (모드에 따라 인덱스 다름)
-        accessPermission: userRow[accessPermissionIndex] || ''  // 접근권한 (모드에 따라 인덱스 다름)
+
+    if (!finalUserRole) {
+      console.error('[정책표] 권한 정보 없음:', { userId, userRole, userInfo });
+      return { hasPermission: false, error: '사용자 권한 정보가 없습니다.' };
+    }
+
+    // 동적 권한 체크: 두 글자 대문자 패턴(팀장) 자동 인식
+    const twoLetterPattern = /^[A-Z]{2}$/;
+    let hasPermission = false;
+
+    // allowedRoles에 'TEAM_LEADER'가 있으면 두 글자 대문자 패턴 체크
+    if (allowedRoles.includes('TEAM_LEADER')) {
+      hasPermission = finalUserRole === 'SS' || finalUserRole === 'S' || twoLetterPattern.test(finalUserRole);
+    } else {
+      // 기존 로직: 직접 권한 레벨 비교
+      hasPermission = allowedRoles.includes(finalUserRole);
+    }
+
+    console.log('[정책표] 권한 체크 결과:', {
+      hasPermission,
+      finalUserRole,
+      allowedRoles,
+      userName: finalUserName,
+      userId: finalUserId,
+      isTeamLeaderCheck: allowedRoles.includes('TEAM_LEADER')
+    });
+
+    // userName이 없으면 에러 (이름은 필수)
+    if (!finalUserName) {
+      console.error('[정책표] 사용자 이름을 찾을 수 없습니다:', { userId, userInfo });
+      return {
+        hasPermission,
+        userRole: finalUserRole,
+        userId: finalUserId,
+        userName: finalUserId, // 폴백: 아이디라도 반환
+        userInfo: userInfo // userInfo 반환 (중복 API 호출 방지)
       };
     }
-  }
-  
-  // userRole이 없으면 userInfo에서 가져오기
-  const finalUserRole = userRole || userInfo?.role;
-  const finalUserId = userId || userInfo?.id;
-  // 이름은 반드시 userInfo에서 가져오기 (아이디가 아닌 이름)
-  const finalUserName = userInfo?.name || null;
 
-  // 디버깅 로그
-  console.log('[정책표] 권한 체크:', {
-    userId: userId,
-    userRole: userRole,
-    finalUserRole: finalUserRole,
-    finalUserId: finalUserId,
-    finalUserName: finalUserName,
-    userInfo: userInfo ? { id: userInfo.id, name: userInfo.name, role: userInfo.role } : null,
-    allowedRoles: allowedRoles
-  });
-
-  if (!finalUserRole) {
-    console.error('[정책표] 권한 정보 없음:', { userId, userRole, userInfo });
-    return { hasPermission: false, error: '사용자 권한 정보가 없습니다.' };
-  }
-
-  // 동적 권한 체크: 두 글자 대문자 패턴(팀장) 자동 인식
-  const twoLetterPattern = /^[A-Z]{2}$/;
-  let hasPermission = false;
-  
-  // allowedRoles에 'TEAM_LEADER'가 있으면 두 글자 대문자 패턴 체크
-  if (allowedRoles.includes('TEAM_LEADER')) {
-    hasPermission = finalUserRole === 'SS' || finalUserRole === 'S' || twoLetterPattern.test(finalUserRole);
-  } else {
-    // 기존 로직: 직접 권한 레벨 비교
-    hasPermission = allowedRoles.includes(finalUserRole);
-  }
-  
-  console.log('[정책표] 권한 체크 결과:', { 
-    hasPermission, 
-    finalUserRole, 
-    allowedRoles,
-    userName: finalUserName,
-    userId: finalUserId,
-    isTeamLeaderCheck: allowedRoles.includes('TEAM_LEADER')
-  });
-  
-  // userName이 없으면 에러 (이름은 필수)
-  if (!finalUserName) {
-    console.error('[정책표] 사용자 이름을 찾을 수 없습니다:', { userId, userInfo });
-  return { 
-    hasPermission, 
-    userRole: finalUserRole, 
-    userId: finalUserId, 
-      userName: finalUserId, // 폴백: 아이디라도 반환
-      userInfo: userInfo // userInfo 반환 (중복 API 호출 방지)
+    return {
+      hasPermission,
+      userRole: finalUserRole,
+      userId: finalUserId,
+      userName: finalUserName,
+      userInfo: userInfo // 🔥 추가: userInfo 반환 (중복 API 호출 방지)
     };
-  }
-  
-  return { 
-    hasPermission, 
-    userRole: finalUserRole, 
-    userId: finalUserId, 
-    userName: finalUserName,
-    userInfo: userInfo // 🔥 추가: userInfo 반환 (중복 API 호출 방지)
-  };
   } catch (error) {
     console.error('[정책표] 권한 체크 오류:', error);
-    return { 
-      hasPermission: false, 
+    return {
+      hasPermission: false,
       error: error.message || '권한 체크 중 오류가 발생했습니다.',
       userRole: null,
       userId: null,
@@ -1110,7 +1110,7 @@ function addToQueue(jobId, userId, userName, policyTableName) {
     // 이미 활성 작업이 있으면 큐에 추가하지 않고 기존 작업 정보 반환
     const existingJobId = Array.from(userJobs)[0];
     const existingJob = generationQueue.queue.find(item => item.jobId === existingJobId) ||
-                       generationQueue.processing.find(item => item.jobId === existingJobId);
+      generationQueue.processing.find(item => item.jobId === existingJobId);
     if (existingJob) {
       return { ...existingJob, isDuplicate: true };
     }
@@ -1126,13 +1126,13 @@ function addToQueue(jobId, userId, userName, policyTableName) {
     queuePosition
   };
   generationQueue.queue.push(queueItem);
-  
+
   // 사용자 활성 작업에 추가
   if (!generationQueue.userActiveJobs.has(userId)) {
     generationQueue.userActiveJobs.set(userId, new Set());
   }
   generationQueue.userActiveJobs.get(userId).add(jobId);
-  
+
   console.log(`📋 [큐] 작업 추가: ${jobId} (${policyTableName}, ${userName}), 대기순번: ${queuePosition}`);
   return queueItem;
 }
@@ -1143,7 +1143,7 @@ function removeFromQueue(jobId) {
   if (index !== -1) {
     const queueItem = generationQueue.queue[index];
     generationQueue.queue.splice(index, 1);
-    
+
     // 사용자 활성 작업에서 제거
     const userJobs = generationQueue.userActiveJobs.get(queueItem.userId);
     if (userJobs) {
@@ -1152,7 +1152,7 @@ function removeFromQueue(jobId) {
         generationQueue.userActiveJobs.delete(queueItem.userId);
       }
     }
-    
+
     // 대기순번 재계산
     generationQueue.queue.forEach((item, idx) => {
       item.queuePosition = idx + 1;
@@ -1186,12 +1186,12 @@ function removeFromProcessing(jobId) {
   if (index !== -1) {
     const processingItem = generationQueue.processing[index];
     generationQueue.processing.splice(index, 1);
-    
+
     // Discord 봇 상태 업데이트
     if (processingItem.discordRequestId) {
       generationQueue.discordBotStatus.activeRequests = Math.max(0, generationQueue.discordBotStatus.activeRequests - 1);
     }
-    
+
     // 사용자 활성 작업에서 제거
     const userJobs = generationQueue.userActiveJobs.get(processingItem.userId);
     if (userJobs) {
@@ -1200,7 +1200,7 @@ function removeFromProcessing(jobId) {
         generationQueue.userActiveJobs.delete(processingItem.userId);
       }
     }
-    
+
     console.log(`⚙️ [큐] 처리 완료: ${jobId}, 처리 중: ${generationQueue.processing.length}`);
   }
 }
@@ -1211,12 +1211,12 @@ function getQueueStatus() {
   const queuedUserIds = new Set(generationQueue.queue.map(item => item.userId));
   const queuedUserCount = queuedUserIds.size;
   const queuedJobCount = generationQueue.queue.length;
-  
+
   // 처리 중인 사용자 수 계산
   const processingUserIds = new Set(generationQueue.processing.map(item => item.userId));
   const processingUserCount = processingUserIds.size;
   const processingJobCount = generationQueue.processing.length;
-  
+
   return {
     queueLength: queuedJobCount,
     processingLength: processingJobCount,
@@ -1291,7 +1291,7 @@ async function processQueue() {
 
       // 큐에서 제거하고 처리 중으로 이동
       removeFromQueue(jobId);
-      
+
       // 작업 상태에서 실제 파라미터 가져오기
       const jobStatus = getJobStatus(jobId);
       if (!jobStatus || !jobStatus.params) {
@@ -1301,10 +1301,10 @@ async function processQueue() {
 
       const params = jobStatus.params;
       const discordRequestId = `REQ_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+
       // 처리 중으로 이동
       addToProcessing(jobId, userId, userName, policyTableName, discordRequestId);
-      
+
       // 상태 업데이트
       updateJobStatus(jobId, {
         ...jobStatus,
@@ -1342,7 +1342,7 @@ async function processQueue() {
 // 정책표 생성 백그라운드 작업
 async function processPolicyTableGeneration(jobId, params, discordRequestId = null) {
   const { policyTableId, applyDate, applyContent, accessGroupId, accessGroupIds, creatorName, creatorRole, creatorId } = params;
-  
+
   // accessGroupIds 배열 처리 (하위 호환성을 위해 accessGroupId도 지원)
   const groupIds = accessGroupIds || (accessGroupId ? [accessGroupId] : []);
 
@@ -1409,10 +1409,10 @@ async function processPolicyTableGeneration(jobId, params, discordRequestId = nu
     });
 
     // "정책" 시트를 찾아서 해당 시트의 URL 생성
-    const originalSheetUrl = policyTablePublicLink || policyTableLink;
-    const sheetUrl = await getPolicySheetUrl(originalSheetUrl, true); // 공개 링크 (스크린샷용)
+    // const originalSheetUrl = policyTablePublicLink || policyTableLink; // publicLink는 ID 추출이 어려울 수 있음
+    const sheetUrl = await getPolicySheetUrl(policyTableLink, true); // 공개 링크 (스크린샷용) - ID 추출을 위해 항상 Edit Link 사용
     const editSheetUrl = await getPolicySheetUrl(policyTableLink, false); // 편집 링크 (엑셀 파일용)
-    
+
     console.log(`[정책표 생성] 📸 사용할 시트 URL (스크린샷): ${sheetUrl}`);
     console.log(`[정책표 생성] 📝 사용할 시트 URL (엑셀): ${editSheetUrl}`);
 
@@ -1429,13 +1429,13 @@ async function processPolicyTableGeneration(jobId, params, discordRequestId = nu
         creatorPermissions, // 생성자적용권한 전달
         editSheetUrl // 엑셀 파일 생성용 편집 링크 ("정책" 시트)
       );
-      
+
       discordResponseTime = Date.now() - discordStartTime;
-      updateDiscordBotStatus({ 
+      updateDiscordBotStatus({
         responseTime: discordResponseTime,
-        isAvailable: true 
+        isAvailable: true
       });
-      
+
       // 이미지 URL, 메시지 ID, 스레드 ID는 모두 captureSheetViaDiscordBot에서 받았으므로
       // 추가 처리 없이 바로 사용
       const messageId = discordMessageId; // 디스코드 봇이 업로드한 메시지 ID
@@ -1452,7 +1452,7 @@ async function processPolicyTableGeneration(jobId, params, discordRequestId = nu
 
       const createdAt = new Date().toISOString();
       const newRowId = `POL_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+
       // 여러 그룹 ID를 JSON 배열 형식으로 저장
       const accessGroupIdsJson = groupIds.length > 0 ? JSON.stringify(groupIds) : '';
 
@@ -1497,7 +1497,7 @@ async function processPolicyTableGeneration(jobId, params, discordRequestId = nu
       updateJobStatus(jobId, {
         status: 'completed',
         progress: 100,
-        message: groupIds.length > 1 
+        message: groupIds.length > 1
           ? `${groupIds.length}개 그룹에 대한 정책표 생성이 완료되었습니다.`
           : '정책표 생성이 완료되었습니다.',
         result: {
@@ -1517,12 +1517,12 @@ async function processPolicyTableGeneration(jobId, params, discordRequestId = nu
       // 디스코드 봇 관련 오류
       discordResponseTime = Date.now() - discordStartTime;
       const errorMessage = discordError.message || '알 수 없는 오류';
-      updateDiscordBotStatus({ 
+      updateDiscordBotStatus({
         error: errorMessage,
         responseTime: discordResponseTime,
         isAvailable: false
       });
-      
+
       // 오류 원인 분석
       let failureReason = '알 수 없음';
       if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('브라우저')) {
@@ -1532,7 +1532,7 @@ async function processPolicyTableGeneration(jobId, params, discordRequestId = nu
       } else if (errorMessage.includes('타임아웃') || errorMessage.includes('timeout')) {
         failureReason = '디스코드 봇 응답 시간 초과';
       }
-      
+
       throw new Error(`${failureReason}: ${errorMessage}`);
     }
   } catch (error) {
@@ -1542,8 +1542,8 @@ async function processPolicyTableGeneration(jobId, params, discordRequestId = nu
       progress: 0,
       message: '정책표 생성에 실패했습니다.',
       error: error.message,
-      failureReason: error.message.includes('로컬 PC') ? '브라우저 문제' : 
-                     error.message.includes('디스코드') ? '디스코드 봇 문제' : '알 수 없음'
+      failureReason: error.message.includes('로컬 PC') ? '브라우저 문제' :
+        error.message.includes('디스코드') ? '디스코드 봇 문제' : '알 수 없음'
     });
   } finally {
     // Puppeteer를 사용하지 않으므로 browser 정리 불필요
@@ -1567,7 +1567,7 @@ function setupPolicyTableRoutes(app) {
       }
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      
+
       // 캐시 확인 (30분 TTL - 읽기 전용 데이터)
       const userId = req.headers['x-user-id'] || req.query.userId;
       const cacheKey = `policy-table-settings-${SPREADSHEET_ID}-${userId || 'all'}`;
@@ -1617,12 +1617,12 @@ function setupPolicyTableRoutes(app) {
               range: `${SHEET_TAB_ORDER}!A:E`
             });
           });
-          
+
           const orderRows = orderResponse.data.values || [];
           if (orderRows.length > 1) {
             const orderDataRows = orderRows.slice(1);
             const userOrderRow = orderDataRows.find(row => row[0] === userId);
-            
+
             if (userOrderRow && userOrderRow[2]) {
               try {
                 const cardOrderArray = JSON.parse(userOrderRow[2]);
@@ -1632,11 +1632,11 @@ function setupPolicyTableRoutes(app) {
                   cardOrderArray.forEach((settingId, index) => {
                     orderMap.set(settingId, index);
                   });
-                  
+
                   // 순서 배열에 있는 카드와 없는 카드 분리
                   const orderedSettings = [];
                   const unorderedSettings = [];
-                  
+
                   settings.forEach(setting => {
                     if (orderMap.has(setting.id)) {
                       orderedSettings.push({ setting, order: orderMap.get(setting.id) });
@@ -1644,13 +1644,13 @@ function setupPolicyTableRoutes(app) {
                       unorderedSettings.push(setting);
                     }
                   });
-                  
+
                   // 순서대로 정렬
                   orderedSettings.sort((a, b) => a.order - b.order);
-                  
+
                   // 순서가 있는 카드 먼저, 그 다음 순서가 없는 카드
                   settings = [...orderedSettings.map(item => item.setting), ...unorderedSettings];
-                  
+
                   console.log('✅ [정책표] 생성카드 순서 적용:', {
                     userId,
                     cardOrderArray,
@@ -1709,7 +1709,7 @@ function setupPolicyTableRoutes(app) {
 
       // 편집 링크 정규화 (시트 ID만 넣어도 전체 URL로 변환)
       const normalizedEditLink = normalizeGoogleSheetEditLink(policyTableLink);
-      
+
       const newId = `PT_${Date.now()}`;
       const registeredAt = new Date().toISOString();
       const registeredBy = permission.userId || 'Unknown';
@@ -1772,12 +1772,12 @@ function setupPolicyTableRoutes(app) {
       });
 
       const rows = response.data.values || [];
-      
+
       // 헤더 행 제외 (첫 번째 행은 헤더)
       if (rows.length < 2) {
         return res.status(404).json({ success: false, error: '정책표 설정을 찾을 수 없습니다.' });
       }
-      
+
       // 헤더를 제외한 데이터 행에서 찾기
       const dataRows = rows.slice(1);
       const rowIndex = dataRows.findIndex(row => row[0] === id);
@@ -1788,17 +1788,17 @@ function setupPolicyTableRoutes(app) {
 
       const existingRow = dataRows[rowIndex];
       const { policyTableName, policyTableDescription, policyTableLink, policyTablePublicLink, discordChannelId, creatorPermissions, restrictSettlementTeam } = req.body;
-      
+
       // 편집 링크 정규화
-      const normalizedEditLink = policyTableLink !== undefined 
+      const normalizedEditLink = policyTableLink !== undefined
         ? normalizeGoogleSheetEditLink(policyTableLink)
         : existingRow[3];
-      
+
       // restrictSettlementTeam 처리 (기존 값이 없으면 false)
-      const restrictSettlementTeamValue = restrictSettlementTeam !== undefined 
+      const restrictSettlementTeamValue = restrictSettlementTeam !== undefined
         ? (restrictSettlementTeam ? 'TRUE' : 'FALSE')
         : (existingRow[9] || 'FALSE');
-      
+
       const updatedRow = [
         id, // 정책표ID는 변경 불가
         policyTableName !== undefined ? policyTableName : existingRow[1],
@@ -1903,34 +1903,34 @@ function setupPolicyTableRoutes(app) {
       // 예산채널확인 탭 접근 권한: SS(총괄), S(정산) 또는 두 글자 대문자 패턴(팀장)
       // 팀장의 경우 확인적용권한자로 설정된 것만 프론트엔드에서 필터링됨
       const permission = await checkPermission(req, ['SS', 'S', 'TEAM_LEADER'], 'budget');
-      
+
       console.log('[예산채널] 권한 체크 결과:', {
         hasPermission: permission.hasPermission,
         userRole: permission.userRole,
         userId: permission.userId,
         error: permission.error
       });
-      
+
       if (!permission.hasPermission) {
         console.error('[예산채널] 접근 거부:', {
           userRole: permission.userRole,
           userId: permission.userId,
           error: permission.error
         });
-        return res.status(403).json({ 
-          success: false, 
-          error: permission.error || '권한이 없습니다. 채널별예산확인 탭은 팀장 권한 이상만 접근할 수 있습니다.' 
+        return res.status(403).json({
+          success: false,
+          error: permission.error || '권한이 없습니다. 채널별예산확인 탭은 팀장 권한 이상만 접근할 수 있습니다.'
         });
       }
-      
+
       // 사용자 정보를 응답에 포함 (프론트엔드 필터링에 사용)
       const userRole = permission.userRole;
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      
+
       // 년월 필터 파라미터
       const yearMonth = req.query.yearMonth;
-      
+
       // 캐시 확인 (30분 TTL) - 년월별로 캐시 분리
       const userId = req.headers['x-user-id'] || req.query.userId;
       const cacheKey = `budget-channel-settings-${SPREADSHEET_ID}-${userId || 'all'}-${yearMonth || 'all'}`;
@@ -2026,7 +2026,7 @@ function setupPolicyTableRoutes(app) {
 
       // 편집 링크 정규화
       const normalizedEditLink = normalizeGoogleSheetEditLink(channelLink);
-      
+
       const newId = `BC_${Date.now()}`;
       const registeredAt = new Date().toISOString();
       const registeredBy = permission.userId || 'Unknown';
@@ -2098,12 +2098,12 @@ function setupPolicyTableRoutes(app) {
       });
 
       const rows = response.data.values || [];
-      
+
       // 헤더 행 제외 (첫 번째 행은 헤더)
       if (rows.length < 2) {
         return res.status(404).json({ success: false, error: '예산채널 설정을 찾을 수 없습니다.' });
       }
-      
+
       // 헤더를 제외한 데이터 행에서 찾기
       const dataRows = rows.slice(1);
       const rowIndex = dataRows.findIndex(row => row[0] === id);
@@ -2400,7 +2400,7 @@ function setupPolicyTableRoutes(app) {
       if (rows.length < 2) {
         return res.status(404).json({ success: false, error: '기본예산 설정을 찾을 수 없습니다.' });
       }
-      
+
       // 헤더를 제외한 데이터 행에서 찾기
       const dataRows = rows.slice(1);
       const rowIndexInFiltered = dataRows.findIndex(row => row[0] === id);
@@ -2627,7 +2627,7 @@ function setupPolicyTableRoutes(app) {
       if (rows.length < 2) {
         return res.status(404).json({ success: false, error: '기본데이터 설정을 찾을 수 없습니다.' });
       }
-      
+
       // 헤더를 제외한 데이터 행에서 찾기
       const dataRows = rows.slice(1);
       const rowIndexInFiltered = dataRows.findIndex(row => row[0] === id);
@@ -2674,7 +2674,7 @@ function setupPolicyTableRoutes(app) {
 
     try {
       const parsed = JSON.parse(dataString);
-      
+
       // 새로운 형식: {"companyNames": [...], "managerIds": [...]}
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         return {
@@ -2682,13 +2682,13 @@ function setupPolicyTableRoutes(app) {
           managerIds: Array.isArray(parsed.managerIds) ? parsed.managerIds : []
         };
       }
-      
+
       // 기존 형식: ["A", "B", "C"] (권한 레벨 배열) - 무시하고 빈 배열 반환
       if (Array.isArray(parsed)) {
         console.log('[정책표] 기존 형식 감지 (권한 레벨 배열), 새로운 형식으로 초기화');
         return { companyNames: [], managerIds: [] };
       }
-      
+
       return { companyNames: [], managerIds: [] };
     } catch (error) {
       console.error('[정책표] 그룹 데이터 파싱 오류:', error);
@@ -2719,15 +2719,15 @@ function setupPolicyTableRoutes(app) {
   // 변경이력 저장 함수
   async function saveGroupChangeHistory(sheets, spreadsheetId, historyData) {
     await ensureSheetHeaders(sheets, spreadsheetId, SHEET_GROUP_CHANGE_HISTORY, HEADERS_GROUP_CHANGE_HISTORY);
-    
+
     const changeId = `HIST_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-    const beforeValueStr = typeof historyData.beforeValue === 'string' 
-      ? historyData.beforeValue 
+    const beforeValueStr = typeof historyData.beforeValue === 'string'
+      ? historyData.beforeValue
       : JSON.stringify(historyData.beforeValue || '');
-    const afterValueStr = typeof historyData.afterValue === 'string' 
-      ? historyData.afterValue 
+    const afterValueStr = typeof historyData.afterValue === 'string'
+      ? historyData.afterValue
       : JSON.stringify(historyData.afterValue || '');
-    
+
     const historyRow = [
       changeId,           // 변경ID
       historyData.groupId,
@@ -2762,13 +2762,13 @@ function setupPolicyTableRoutes(app) {
       const userRole = req.headers['x-user-role'] || req.query?.userRole;
       const twoLetterPattern = /^[A-Z]{2}$/;
       const hasPermission = userRole === 'SS' || userRole === 'S' || twoLetterPattern.test(userRole);
-      
+
       if (!hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      
+
       // 캐시 확인 (TTL 내)
       const cacheKey = `user-groups-${SPREADSHEET_ID}`;
       const cached = getCache(cacheKey);
@@ -2783,11 +2783,11 @@ function setupPolicyTableRoutes(app) {
       let response;
       try {
         response = await withRetry(async () => {
-        return await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_USER_GROUPS}!A:F`
+          return await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_USER_GROUPS}!A:F`
+          });
         });
-      });
       } catch (err) {
         // rate limit 등으로 실패 시 마지막 성공 데이터라도 반환
         const isRateLimitError =
@@ -3182,7 +3182,7 @@ function setupPolicyTableRoutes(app) {
       const userRole = req.headers['x-user-role'] || req.query?.userRole;
       const twoLetterPattern = /^[A-Z]{2}$/;
       const hasPermission = userRole === 'SS' || userRole === 'S' || twoLetterPattern.test(userRole);
-      
+
       if (!hasPermission) {
         console.warn('❌ [변경이력] 권한 없음:', {
           요청경로: req.path,
@@ -3194,7 +3194,7 @@ function setupPolicyTableRoutes(app) {
 
       const { id } = req.params;
       console.log('🔍 [변경이력] 변경 이력 조회 시작:', { 그룹ID: id, 사용자역할: userRole });
-      
+
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_GROUP_CHANGE_HISTORY, HEADERS_GROUP_CHANGE_HISTORY);
 
@@ -3207,14 +3207,14 @@ function setupPolicyTableRoutes(app) {
 
       const rows = response.data.values || [];
       console.log('🔍 [변경이력] 총 행 수:', rows.length);
-      
+
       if (rows.length < 2) {
         console.log('ℹ️ [변경이력] 데이터 없음, 빈 배열 반환');
         return res.json([]);
       }
 
       const dataRows = rows.slice(1);
-      
+
       // 해당 그룹ID의 변경이력만 필터링
       const history = dataRows
         .filter(row => row[1] === id) // 그룹ID로 필터링
@@ -3223,14 +3223,14 @@ function setupPolicyTableRoutes(app) {
             // 변경전값과 변경후값 파싱 (JSON 배열일 수 있음)
             let beforeValue = row[5] || '';
             let afterValue = row[6] || '';
-            
+
             try {
               const beforeParsed = JSON.parse(beforeValue);
               beforeValue = Array.isArray(beforeParsed) ? beforeParsed : beforeValue;
             } catch (e) {
               // JSON이 아니면 문자열 그대로 사용
             }
-            
+
             try {
               const afterParsed = JSON.parse(afterValue);
               afterValue = Array.isArray(afterParsed) ? afterParsed : afterValue;
@@ -3309,17 +3309,17 @@ function setupPolicyTableRoutes(app) {
         그룹ID: req.params.id,
         사용자역할: req.headers['x-user-role'] || req.query?.userRole
       });
-      
+
       // 시트가 존재하지 않는 경우 빈 배열 반환
       if (error.message && error.message.includes('Unable to parse range')) {
         console.warn('⚠️ [변경이력] 시트를 찾을 수 없음, 빈 배열 반환');
         return res.json([]);
       }
-      
-      return res.status(500).json({ 
-        success: false, 
-        error: '변경 이력 조회에 실패했습니다.', 
-        details: error.message 
+
+      return res.status(500).json({
+        success: false,
+        error: '변경 이력 조회에 실패했습니다.',
+        details: error.message
       });
     }
   });
@@ -3331,7 +3331,7 @@ function setupPolicyTableRoutes(app) {
       const userRole = req.headers['x-user-role'] || req.query?.userRole;
       const twoLetterPattern = /^[A-Z]{2}$/;
       const hasPermission = userRole === 'SS' || userRole === 'S' || twoLetterPattern.test(userRole);
-      
+
       if (!hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
@@ -3339,7 +3339,7 @@ function setupPolicyTableRoutes(app) {
       const { id: groupId } = req.params;
       const { changeId } = req.params;
       const permission = await checkPermission(req, ['SS', 'TEAM_LEADER', 'S']);
-      
+
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_GROUP_CHANGE_HISTORY, HEADERS_GROUP_CHANGE_HISTORY);
 
@@ -3365,12 +3365,12 @@ function setupPolicyTableRoutes(app) {
 
       const existingRow = dataRows[rowIndex];
       const updatedRow = [...existingRow];
-      
+
       // 배열 길이를 최소 14로 보장
       while (updatedRow.length < 14) {
         updatedRow.push('');
       }
-      
+
       // 변경이력 데이터 파싱
       let afterValue = [];
       try {
@@ -3380,7 +3380,7 @@ function setupPolicyTableRoutes(app) {
       } catch (e) {
         afterValue = existingRow[6] ? [existingRow[6]] : [];
       }
-      
+
       // 기존 폰클적용업체명 파싱
       let phoneAppliedCompanies = [];
       try {
@@ -3390,10 +3390,10 @@ function setupPolicyTableRoutes(app) {
       } catch (e) {
         phoneAppliedCompanies = [];
       }
-      
+
       // 요청에서 특정 업체명이 있는지 확인 (프론트엔드에서 전달)
       const { companyName } = req.body; // 선택적: 특정 업체명
-      
+
       // 업체명별 개별 적용
       if (existingRow[3] === '업체명' && companyName) {
         // 특정 업체명에만 폰클 적용
@@ -3413,7 +3413,7 @@ function setupPolicyTableRoutes(app) {
           updatedRow[13] = JSON.stringify(phoneAppliedCompanies);
         }
       }
-      
+
       updatedRow[11] = new Date().toISOString(); // 폰클적용일시
       updatedRow[12] = permission.userName || permission.userId || 'Unknown'; // 폰클적용자
 
@@ -3449,7 +3449,7 @@ function setupPolicyTableRoutes(app) {
       const userRole = req.headers['x-user-role'] || req.query?.userRole;
       const twoLetterPattern = /^[A-Z]{2}$/;
       const hasPermission = userRole === 'SS' || userRole === 'S' || twoLetterPattern.test(userRole);
-      
+
       if (!hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
@@ -3476,12 +3476,12 @@ function setupPolicyTableRoutes(app) {
 
       const existingRow = rows[rowIndex];
       const updatedRow = [...existingRow];
-      
+
       // 배열 길이를 최소 6으로 보장
       while (updatedRow.length < 6) {
         updatedRow.push('');
       }
-      
+
       // 폰클 등록 여부 업데이트
       updatedRow[5] = phoneRegistered ? 'Y' : 'N';
 
@@ -3515,13 +3515,13 @@ function setupPolicyTableRoutes(app) {
       const userRole = req.headers['x-user-role'] || req.query?.userRole;
       const twoLetterPattern = /^[A-Z]{2}$/;
       const hasPermission = userRole === 'SS' || userRole === 'S' || twoLetterPattern.test(userRole);
-      
+
       if (!hasPermission) {
         return res.status(403).json({ success: false, error: '권한이 없습니다.' });
       }
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      
+
       // 캐시 확인 (30분 TTL)
       const cacheKey = `companies-${SPREADSHEET_ID}`;
       const cached = getCache(cacheKey);
@@ -3531,7 +3531,7 @@ function setupPolicyTableRoutes(app) {
       }
 
       const generalModeSheetName = '일반모드권한관리';
-      
+
       // A~K열 범위로 읽기 (B열=업체명, I열=일반정책모드 권한, K열=담당자 아이디)
       const response = await withRetry(async () => {
         return await sheets.spreadsheets.values.get({
@@ -3547,15 +3547,15 @@ function setupPolicyTableRoutes(app) {
 
       // 헤더 3행 제외하고 4행부터 데이터
       const dataRows = rows.slice(3);
-      
+
       // 업체명별로 그룹화 (같은 업체명에 여러 담당자가 있을 수 있음)
       const companyMap = new Map();
-      
+
       dataRows.forEach(row => {
         const companyName = (row[1] || '').trim(); // B열: 업체명
         const generalPolicyPermission = (row[8] || '').trim(); // I열: 일반정책모드 권한
         const managerId = (row[10] || '').trim(); // K열: 담당자 아이디
-        
+
         // I열에 "O" 권한이 있는 경우만 포함
         if (companyName && generalPolicyPermission === 'O' && managerId) {
           if (!companyMap.has(companyName)) {
@@ -3564,7 +3564,7 @@ function setupPolicyTableRoutes(app) {
               managerIds: []
             });
           }
-          
+
           const company = companyMap.get(companyName);
           if (!company.managerIds.includes(managerId)) {
             company.managerIds.push(managerId);
@@ -3573,14 +3573,14 @@ function setupPolicyTableRoutes(app) {
       });
 
       const companies = Array.from(companyMap.values());
-      
+
       // 캐시에 저장 (30분 TTL)
       const result = {
         success: true,
         companies: companies
       };
       setCache(cacheKey, result, CACHE_TTL.COMPANIES);
-      
+
       console.log('✅ [정책표] 업체명 목록 로드:', {
         totalCompanies: companies.length,
         companies: companies.map(c => ({
@@ -3626,7 +3626,7 @@ function setupPolicyTableRoutes(app) {
       // checkPermission에서 이미 조회한 userInfo 재사용 (중복 API 호출 방지)
       const headerUserId = req.headers['x-user-id'] || '';
       let creatorId = headerUserId;
-      
+
       // checkPermission에서 이미 조회한 userInfo 사용 (API 호출 중복 방지)
       if (permission.userInfo && permission.userInfo.id) {
         creatorId = permission.userInfo.id; // 이미 조회된 contactId 사용
@@ -3671,9 +3671,9 @@ function setupPolicyTableRoutes(app) {
       // 사용자가 이미 활성 작업이 있는지 확인
       const userId = permission.userId || '';
       if (hasUserActiveJob(userId)) {
-        return res.status(409).json({ 
-          success: false, 
-          error: '이미 진행 중인 정책표 생성 작업이 있습니다. 완료될 때까지 기다려주세요.' 
+        return res.status(409).json({
+          success: false,
+          error: '이미 진행 중인 정책표 생성 작업이 있습니다. 완료될 때까지 기다려주세요.'
         });
       }
 
@@ -3681,7 +3681,7 @@ function setupPolicyTableRoutes(app) {
       let policyTableName = '정책표';
       const policyTableNameCacheKey = `policy-table-name-${policyTableId}`;
       const cachedPolicyTableName = getCache(policyTableNameCacheKey);
-      
+
       if (cachedPolicyTableName) {
         policyTableName = cachedPolicyTableName;
       } else {
@@ -3694,7 +3694,7 @@ function setupPolicyTableRoutes(app) {
               range: `${SHEET_POLICY_TABLE_SETTINGS}!A:B`
             });
           });
-          
+
           // 응답이 없거나 data가 없는 경우 처리
           if (!settingsResponse || !settingsResponse.data) {
             console.warn('정책표 이름 조회 실패: 응답이 없습니다.');
@@ -3709,10 +3709,10 @@ function setupPolicyTableRoutes(app) {
           }
         } catch (error) {
           // 할당량 초과 오류인 경우 경고만 출력하고 기본값 사용
-          const isRateLimitError = error.code === 429 || 
+          const isRateLimitError = error.code === 429 ||
             error.message?.includes('Quota exceeded') ||
             error.message?.includes('rateLimitExceeded');
-          
+
           if (isRateLimitError) {
             console.warn('⚠️ [정책표 이름 조회] 할당량 초과로 기본값 사용:', error.message);
           } else {
@@ -3738,11 +3738,11 @@ function setupPolicyTableRoutes(app) {
 
       // 큐에 작업 추가
       const queueItem = addToQueue(jobId, userId, permission.userName || 'Unknown', policyTableName);
-      
+
       // 중복 요청인 경우
       if (queueItem.isDuplicate) {
-        return res.status(409).json({ 
-          success: false, 
+        return res.status(409).json({
+          success: false,
           error: '이미 진행 중인 정책표 생성 작업이 있습니다.',
           existingJobId: queueItem.jobId
         });
@@ -3814,7 +3814,7 @@ function setupPolicyTableRoutes(app) {
       const queueStatus = getQueueStatus();
       const queueItem = generationQueue.queue.find(item => item.jobId === jobId);
       const processingItem = generationQueue.processing.find(item => item.jobId === jobId);
-      
+
       const response = {
         ...status,
         queueInfo: {
@@ -3849,13 +3849,13 @@ function setupPolicyTableRoutes(app) {
       const userId = req.headers['x-user-id'] || req.query.userId;
       const mode = req.query.mode;
       const isGeneralPolicyMode = mode === 'generalPolicy' || mode === 'general-policy';
-      
+
       if (!userRole && !isGeneralPolicyMode) {
         return res.status(400).json({ success: false, error: '사용자 권한 정보가 필요합니다.' });
       }
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      
+
       // 캐시 확인 (30초 TTL)
       const cacheKey = `policy-tables-tabs-${SPREADSHEET_ID}-${mode || 'all'}-${userId || 'all'}-${userRole || 'all'}`;
       const cached = getCache(cacheKey);
@@ -3877,7 +3877,7 @@ function setupPolicyTableRoutes(app) {
         });
       });
       const settingsRows = settingsResponse.data.values || [];
-      
+
       // restrictSettlementTeam 정보를 포함한 Map 생성
       const restrictSettlementTeamMap = new Map();
       if (settingsRows.length >= 2) {
@@ -3903,7 +3903,7 @@ function setupPolicyTableRoutes(app) {
       }
 
       const dataRows = rows.slice(1);
-      
+
       let tabs = dataRows.map(row => ({
         policyTableId: row[0] || '',
         policyTableName: row[1] || '',
@@ -3914,38 +3914,38 @@ function setupPolicyTableRoutes(app) {
       if (isGeneralPolicyMode) {
         // 일반정책모드 필터링: companyNames 기반
         const currentUserId = req.headers['x-user-id'] || userId;
-        
+
         // 정책영업그룹 목록과 일반모드권한관리 시트를 병렬로 조회 (캐시 우선)
         const userGroupsCacheKey = `user-groups-${SPREADSHEET_ID}`;
         const generalModeCacheKey = `general-mode-permission-${SPREADSHEET_ID}`;
         const cachedUserGroups = getCache(userGroupsCacheKey);
         const cachedGeneralMode = getCache(generalModeCacheKey);
-        
+
         // 병렬로 필요한 데이터 조회 (캐시에 없을 때만 API 호출)
         const [userGroupsData, generalModeData, policyListData] = await Promise.all([
           // 정책영업그룹 목록 조회
           (async () => {
-        if (cachedUserGroups) {
+            if (cachedUserGroups) {
               return cachedUserGroups;
             }
             await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
-          const userGroupsResponse = await withRetry(async () => {
-            return await sheets.spreadsheets.values.get({
-              spreadsheetId: SPREADSHEET_ID,
-              range: `${SHEET_USER_GROUPS}!A:E`
+            const userGroupsResponse = await withRetry(async () => {
+              return await sheets.spreadsheets.values.get({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${SHEET_USER_GROUPS}!A:E`
+              });
             });
-          });
-          const userGroupsRows = userGroupsResponse.data.values || [];
-          const userGroupsDataRows = userGroupsRows.slice(1);
+            const userGroupsRows = userGroupsResponse.data.values || [];
+            const userGroupsDataRows = userGroupsRows.slice(1);
             const groups = userGroupsDataRows.map(row => {
               const groupId = row[0] || '';
               const groupName = row[1] || '';
-            const groupData = parseUserGroupData(row[2]);
-              return { 
-                id: groupId, 
+              const groupData = parseUserGroupData(row[2]);
+              return {
+                id: groupId,
                 name: groupName,  // name 필드 추가 (하위 호환성)
                 groupName: groupName,  // groupName 필드도 유지
-                ...groupData 
+                ...groupData
               };
             });
             setCache(userGroupsCacheKey, groups, CACHE_TTL.USER_GROUPS);
@@ -3956,15 +3956,15 @@ function setupPolicyTableRoutes(app) {
             if (cachedGeneralMode) {
               return cachedGeneralMode;
             }
-        const generalModeSheetName = '일반모드권한관리';
-          const generalModeResponse = await withRetry(async () => {
-            return await sheets.spreadsheets.values.get({
-              spreadsheetId: SPREADSHEET_ID,
-              range: `${generalModeSheetName}!A:K`
+            const generalModeSheetName = '일반모드권한관리';
+            const generalModeResponse = await withRetry(async () => {
+              return await sheets.spreadsheets.values.get({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${generalModeSheetName}!A:K`
+              });
             });
-          });
             const generalModeRows = generalModeResponse.data.values || [];
-          setCache(generalModeCacheKey, generalModeRows, CACHE_TTL.GENERAL_MODE_PERMISSION);
+            setCache(generalModeCacheKey, generalModeRows, CACHE_TTL.GENERAL_MODE_PERMISSION);
             return generalModeRows;
           })(),
           // 정책표목록 조회 (접근권한 확인용 - 캐시 활용)
@@ -4052,7 +4052,7 @@ function setupPolicyTableRoutes(app) {
         });
       } else if (userRole && /^[A-Z]{2}$/.test(userRole)) {
         // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표 + 담당자인 그룹의 정책표 탭 표시
-        
+
         // 🔥 중요: 정책표 생성 시 저장된 creatorId와 동일한 방식으로 사용자 ID를 찾아야 함
         // req.headers['x-user-id']를 직접 사용하여 대리점아이디관리 시트에서 C열 값을 찾음
         const headerUserId = req.headers['x-user-id'] || userId;
@@ -4084,7 +4084,7 @@ function setupPolicyTableRoutes(app) {
           console.warn('[정책표 탭] 사용자 ID 조회 실패, headerUserId 사용:', error.message);
           // 에러 발생 시 headerUserId 그대로 사용
         }
-        
+
         // 정책표 설정 조회 (생성자적용권한 확인용)
         await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_SETTINGS, HEADERS_POLICY_TABLE_SETTINGS);
         const settingsResponse = await withRetry(async () => {
@@ -4110,26 +4110,26 @@ function setupPolicyTableRoutes(app) {
             }
           });
         }
-        
+
         // 정책표목록과 정책영업그룹 목록을 병렬로 조회 (캐시 우선)
         const policyListCacheKey = `policy-tables-list-for-tabs-${SPREADSHEET_ID}`;
         const userGroupsCacheKey = `user-groups-${SPREADSHEET_ID}`;
         const cachedPolicyList = getCache(policyListCacheKey);
         const cachedUserGroups = getCache(userGroupsCacheKey);
-        
+
         const [policyListData, userGroupsData] = await Promise.all([
           // 정책표목록 조회
           (async () => {
             if (cachedPolicyList) {
               return cachedPolicyList;
             }
-        const policyListResponse = await withRetry(async () => {
-          return await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: `${SHEET_POLICY_TABLE_LIST}!A:P` // A:O -> A:P로 변경 (엑셀파일URL 포함)
-          });
-        });
-        const policyRows = policyListResponse.data.values || [];
+            const policyListResponse = await withRetry(async () => {
+              return await sheets.spreadsheets.values.get({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${SHEET_POLICY_TABLE_LIST}!A:P` // A:O -> A:P로 변경 (엑셀파일URL 포함)
+              });
+            });
+            const policyRows = policyListResponse.data.values || [];
             setCache(policyListCacheKey, policyRows, CACHE_TTL.POLICY_TABLES);
             return policyRows;
           })(),
@@ -4139,33 +4139,33 @@ function setupPolicyTableRoutes(app) {
               return cachedUserGroups;
             }
             await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
-        const userGroupsResponse = await withRetry(async () => {
-          return await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: `${SHEET_USER_GROUPS}!A:E`
-          });
-        });
-        const userGroupsRows = userGroupsResponse.data.values || [];
-        const userGroupsDataRows = userGroupsRows.slice(1);
+            const userGroupsResponse = await withRetry(async () => {
+              return await sheets.spreadsheets.values.get({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${SHEET_USER_GROUPS}!A:E`
+              });
+            });
+            const userGroupsRows = userGroupsResponse.data.values || [];
+            const userGroupsDataRows = userGroupsRows.slice(1);
             const groups = userGroupsDataRows.map(row => {
               const groupId = row[0] || '';
               const groupName = row[1] || '';
-          const groupData = parseUserGroupData(row[2]);
-              return { 
-                id: groupId, 
+              const groupData = parseUserGroupData(row[2]);
+              return {
+                id: groupId,
                 name: groupName,  // name 필드 추가 (하위 호환성)
                 groupName: groupName,  // groupName 필드도 유지
-                ...groupData 
+                ...groupData
               };
             });
             setCache(userGroupsCacheKey, groups, CACHE_TTL.USER_GROUPS);
             return groups;
           })()
         ]);
-        
+
         const policyRows = Array.isArray(policyListData) ? policyListData : [];
         const policyDataRows = policyRows.length > 1 ? policyRows.slice(1) : [];
-        
+
         const userGroupsMap = new Map();
         if (Array.isArray(userGroupsData)) {
           userGroupsData.forEach(group => {
@@ -4180,13 +4180,13 @@ function setupPolicyTableRoutes(app) {
             }
           });
         }
-        
+
         const accessiblePolicyTableIds = new Set();
         policyDataRows.forEach(row => {
           const creatorId = row[13] || ''; // 생성자ID
           const accessGroupIds = parseAccessGroupIds(row[5]); // 접근권한 (그룹ID 배열)
           const policyTableId = row[1] || ''; // 정책표ID_설정
-          
+
           // 🔥 디버깅: 본인이 생성한 정책표인지 확인
           // creatorId와 currentUserId를 숫자만 추출하여 비교 (전화번호 형식 차이 해결)
           const normalizePhoneNumber = (phone) => {
@@ -4196,11 +4196,11 @@ function setupPolicyTableRoutes(app) {
             // 앞의 0 제거 (01053336333 -> 1053336333)
             return digits.replace(/^0+/, '') || digits;
           };
-          
+
           const normalizedCreatorId = normalizePhoneNumber(creatorId);
           const normalizedCurrentUserId = normalizePhoneNumber(currentUserId);
           const isCreator = normalizedCreatorId && normalizedCurrentUserId && normalizedCreatorId === normalizedCurrentUserId;
-          
+
           if (isCreator) {
             console.log('✅ [정책표 탭] 본인이 생성한 정책표 발견:', {
               policyTableId,
@@ -4224,7 +4224,7 @@ function setupPolicyTableRoutes(app) {
               match: false
             });
           }
-          
+
           // 2. 본인이 담당자인 그룹의 정책표인지 확인
           let isManager = false;
           for (const accessGroupId of accessGroupIds) {
@@ -4246,7 +4246,7 @@ function setupPolicyTableRoutes(app) {
               }
             }
           }
-          
+
           // 3. 정책 생성 가능자(creatorPermissions)에 포함되어 있는지 확인
           let hasCreatorPermission = false;
           const creatorPermissions = settingsMap.get(policyTableId) || [];
@@ -4262,7 +4262,7 @@ function setupPolicyTableRoutes(app) {
               accessiblePolicyTableIds.add(policyTableId); // 정책표ID_설정
             }
           }
-          
+
           // 정책표 탭에서는 본인이 생성한 정책표 또는 담당자인 그룹의 정책표 또는 정책 생성 가능자 권한이 있는 정책표만 표시
           if (isCreator || isManager || hasCreatorPermission) {
             console.log('✅ [정책표 탭] 접근 가능한 정책표:', {
@@ -4275,7 +4275,7 @@ function setupPolicyTableRoutes(app) {
             });
           }
         });
-        
+
         tabs = tabs.filter(tab => accessiblePolicyTableIds.has(tab.policyTableId));
       } else {
         // 그 외 사용자(A-F)는 그룹의 담당자(managerIds)에 포함된 경우만 해당 그룹의 탭 표시
@@ -4343,12 +4343,12 @@ function setupPolicyTableRoutes(app) {
               range: `${SHEET_TAB_ORDER}!A:D`
             });
           });
-          
+
           const orderRows = orderResponse.data.values || [];
           if (orderRows.length > 1) {
             const orderDataRows = orderRows.slice(1);
             const userOrderRow = orderDataRows.find(row => row[0] === currentUserId);
-            
+
             if (userOrderRow && userOrderRow[1]) {
               try {
                 const orderArray = JSON.parse(userOrderRow[1]);
@@ -4358,11 +4358,11 @@ function setupPolicyTableRoutes(app) {
                   orderArray.forEach((policyTableId, index) => {
                     orderMap.set(policyTableId, index);
                   });
-                  
+
                   // 순서 배열에 있는 탭과 없는 탭 분리
                   const orderedTabs = [];
                   const unorderedTabs = [];
-                  
+
                   tabs.forEach(tab => {
                     if (orderMap.has(tab.policyTableId)) {
                       orderedTabs.push({ tab, order: orderMap.get(tab.policyTableId) });
@@ -4370,10 +4370,10 @@ function setupPolicyTableRoutes(app) {
                       unorderedTabs.push(tab);
                     }
                   });
-                  
+
                   // 순서대로 정렬
                   orderedTabs.sort((a, b) => a.order - b.order);
-                  
+
                   // 순서가 있는 탭 먼저, 그 다음 순서가 없는 탭
                   tabs = [...orderedTabs.map(item => item.tab), ...unorderedTabs];
                 }
@@ -4413,17 +4413,17 @@ function setupPolicyTableRoutes(app) {
       }
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      
+
       // 캐시 키 생성 (사용자별, 모드별, 정책표이름별로 구분)
       const cacheKey = `policy-tables-${SPREADSHEET_ID}-all-${policyTableName}-${mode || 'all'}-${currentUserId || 'all'}-${userRole || 'all'}`;
-      
+
       // 캐시 확인 (30초 TTL)
       const cached = getCache(cacheKey);
       if (cached) {
         console.log('✅ [캐시 히트] 정책표 목록');
         return res.json(cached);
       }
-      
+
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_LIST, HEADERS_POLICY_TABLE_LIST);
 
       const response = await withRetry(async () => {
@@ -4439,16 +4439,16 @@ function setupPolicyTableRoutes(app) {
       }
 
       const dataRows = rows.slice(1);
-      
+
       // 정책영업그룹 목록 조회 (정액영업그룹 이름 표시용 - 정책모드에서만)
       // 캐시에서 가져오기 또는 병렬 조회
       let userGroupsNameMap = new Map();
       let userGroupsMap = new Map(); // 일반정책모드에서도 사용
-      
+
       if (!isGeneralPolicyMode) {
         const userGroupsCacheKey = `user-groups-${SPREADSHEET_ID}`;
         const cachedUserGroups = getCache(userGroupsCacheKey);
-        
+
         if (cachedUserGroups && Array.isArray(cachedUserGroups)) {
           // 캐시에서 가져온 데이터를 Map으로 변환
           // 캐시 데이터 구조: { id, groupName, companyNames, managerIds, ... }
@@ -4468,7 +4468,7 @@ function setupPolicyTableRoutes(app) {
               range: `${SHEET_USER_GROUPS}!A:E`
             });
           });
-          
+
           const userGroupsRows = userGroupsResponse.data.values || [];
           const userGroupsDataRows = userGroupsRows.slice(1);
           userGroupsDataRows.forEach(row => {
@@ -4480,7 +4480,7 @@ function setupPolicyTableRoutes(app) {
           });
         }
       }
-      
+
       let policies = dataRows
         .filter(row => {
           // 정책표이름 필터
@@ -4492,14 +4492,14 @@ function setupPolicyTableRoutes(app) {
         .map(row => {
           const accessGroupId = row[5] || '';
           const accessGroupIds = parseAccessGroupIds(accessGroupId);
-          
+
           // 정액영업그룹 이름 배열 생성 (정책모드에서만)
           const accessGroupNames = !isGeneralPolicyMode && accessGroupIds.length > 0
             ? accessGroupIds
-                .map(groupId => userGroupsNameMap.get(groupId))
-                .filter(name => name) // undefined 제거
+              .map(groupId => userGroupsNameMap.get(groupId))
+              .filter(name => name) // undefined 제거
             : [];
-          
+
           // 확인이력 파싱
           let viewHistory = [];
           try {
@@ -4512,7 +4512,7 @@ function setupPolicyTableRoutes(app) {
             console.warn('[정책표] 확인이력 파싱 오류:', e);
             viewHistory = [];
           }
-          
+
           return {
             id: row[0] || '',
             policyTableId: row[1] || '',
@@ -4541,32 +4541,32 @@ function setupPolicyTableRoutes(app) {
         const generalModeCacheKey = `general-mode-permission-${SPREADSHEET_ID}`;
         const cachedUserGroups = getCache(userGroupsCacheKey);
         const cachedGeneralMode = getCache(generalModeCacheKey);
-        
+
         // 병렬로 필요한 데이터 조회 (캐시에 없을 때만 API 호출)
         const [userGroupsData, generalModeData] = await Promise.all([
           // 정책영업그룹 목록 조회
           (async () => {
-        if (cachedUserGroups && Array.isArray(cachedUserGroups)) {
+            if (cachedUserGroups && Array.isArray(cachedUserGroups)) {
               return cachedUserGroups;
             }
-          await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
-          const userGroupsResponse = await withRetry(async () => {
-            return await sheets.spreadsheets.values.get({
-              spreadsheetId: SPREADSHEET_ID,
-              range: `${SHEET_USER_GROUPS}!A:E`
+            await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
+            const userGroupsResponse = await withRetry(async () => {
+              return await sheets.spreadsheets.values.get({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${SHEET_USER_GROUPS}!A:E`
+              });
             });
-          });
-          const userGroupsRows = userGroupsResponse.data.values || [];
-          const userGroupsDataRows = userGroupsRows.slice(1);
+            const userGroupsRows = userGroupsResponse.data.values || [];
+            const userGroupsDataRows = userGroupsRows.slice(1);
             const groups = userGroupsDataRows.map(row => {
               const groupId = row[0] || '';
               const groupName = row[1] || '';
-            const groupData = parseUserGroupData(row[2]);
-              return { 
-                id: groupId, 
+              const groupData = parseUserGroupData(row[2]);
+              return {
+                id: groupId,
                 name: groupName,  // name 필드 추가 (하위 호환성)
                 groupName: groupName,  // groupName 필드도 유지
-                ...groupData 
+                ...groupData
               };
             });
             setCache(userGroupsCacheKey, groups, CACHE_TTL.USER_GROUPS);
@@ -4577,19 +4577,19 @@ function setupPolicyTableRoutes(app) {
             if (cachedGeneralMode && Array.isArray(cachedGeneralMode)) {
               return cachedGeneralMode;
             }
-        const generalModeSheetName = '일반모드권한관리';
-          const generalModeResponse = await withRetry(async () => {
-            return await sheets.spreadsheets.values.get({
-              spreadsheetId: SPREADSHEET_ID,
-              range: `${generalModeSheetName}!A:K`
+            const generalModeSheetName = '일반모드권한관리';
+            const generalModeResponse = await withRetry(async () => {
+              return await sheets.spreadsheets.values.get({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${generalModeSheetName}!A:K`
+              });
             });
-          });
             const generalModeRows = generalModeResponse.data.values || [];
             setCache(generalModeCacheKey, generalModeRows, CACHE_TTL.GENERAL_MODE_PERMISSION);
             return generalModeRows;
           })()
         ]);
-        
+
         // 데이터 처리
         const userGroupsMap = new Map();
         if (Array.isArray(userGroupsData)) {
@@ -4605,7 +4605,7 @@ function setupPolicyTableRoutes(app) {
             }
           });
         }
-        
+
         const generalModeRows = Array.isArray(generalModeData) ? generalModeData : [];
         let userCompanyName = null;
         if (generalModeRows.length > 3) {
@@ -4632,14 +4632,14 @@ function setupPolicyTableRoutes(app) {
           totalPolicies: policies.length,
           userGroupsMapSize: userGroupsMap.size
         });
-        
+
         policies = policies.filter(policy => {
           const accessGroupIds = parseAccessGroupIds(policy.accessGroupId);
           if (accessGroupIds.length === 0) {
             console.log('❌ [일반정책모드] 접근권한 없음:', policy.id);
             return false; // 접근권한이 없으면 접근 불가
           }
-          
+
           // 여러 그룹 중 하나라도 매칭되면 접근 가능
           for (const accessGroupId of accessGroupIds) {
             const groupData = userGroupsMap.get(accessGroupId);
@@ -4657,14 +4657,14 @@ function setupPolicyTableRoutes(app) {
               }
             }
           }
-          
+
           console.log('❌ [일반정책모드] 정책표 필터링 - 접근 거부:', {
             policyId: policy.id,
             accessGroupIds
           });
           return false;
         });
-        
+
         console.log('✅ [일반정책모드] 필터링 완료:', {
           filteredCount: policies.length
         });
@@ -4699,11 +4699,11 @@ function setupPolicyTableRoutes(app) {
       } else if (userRole && /^[A-Z]{2}$/.test(userRole)) {
         // 팀장 레벨(두 글자 대문자 패턴)은 본인이 생성한 정책표 + 담당자인 그룹의 정책표 확인 가능
         const currentUserId = req.headers['x-user-id'] || req.query.userId;
-        
+
         // 정책영업그룹 목록 조회 (담당자 필터링용) - 캐시에서 가져오기
         const userGroupsCacheKey = `user-groups-${SPREADSHEET_ID}`;
         const cachedUserGroups = getCache(userGroupsCacheKey);
-        
+
         const userGroupsMap = new Map();
         if (cachedUserGroups && Array.isArray(cachedUserGroups)) {
           // 캐시에서 가져온 데이터를 Map으로 변환
@@ -4734,14 +4734,14 @@ function setupPolicyTableRoutes(app) {
             userGroupsMap.set(groupId, groupData);
           });
         }
-        
+
         console.log('🔍 [정책모드] 팀장 필터링 시작:', {
           userRole,
           currentUserId,
           totalPolicies: policies.length,
           userGroupsMapSize: userGroupsMap.size
         });
-        
+
         // 정책표 설정 조회 (생성자적용권한 확인용)
         await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_TABLE_SETTINGS, HEADERS_POLICY_TABLE_SETTINGS);
         const settingsResponse = await withRetry(async () => {
@@ -4770,7 +4770,7 @@ function setupPolicyTableRoutes(app) {
             }
           });
         }
-        
+
         // 전화번호 정규화 함수 (정책표 탭과 동일한 로직)
         const normalizePhoneNumber = (phone) => {
           if (!phone) return '';
@@ -4779,7 +4779,7 @@ function setupPolicyTableRoutes(app) {
           // 앞의 0 제거 (01053336333 -> 1053336333)
           return digits.replace(/^0+/, '') || digits;
         };
-        
+
         policies = policies.filter(policy => {
           // 1. 본인이 생성한 정책표인지 확인 (전화번호 정규화 적용)
           let isCreator = false;
@@ -4788,7 +4788,7 @@ function setupPolicyTableRoutes(app) {
             const normalizedCurrentUserId = normalizePhoneNumber(currentUserId);
             isCreator = normalizedCreatorId && normalizedCurrentUserId && normalizedCreatorId === normalizedCurrentUserId;
           }
-          
+
           // 2. 본인이 담당자인 그룹의 정책표인지 확인
           let isManager = false;
           const accessGroupIds = parseAccessGroupIds(policy.accessGroupId);
@@ -4810,17 +4810,17 @@ function setupPolicyTableRoutes(app) {
               }
             }
           }
-          
+
           // 3. 정책 생성 가능자(creatorPermissions)에 포함되어 있는지 확인
           let hasCreatorPermission = false;
           const creatorPermissions = settingsMap.get(policy.policyTableId) || [];
           if (Array.isArray(creatorPermissions) && creatorPermissions.length > 0 && userRole) {
             hasCreatorPermission = creatorPermissions.includes(userRole);
           }
-          
+
           // 정책표 목록 조회에서도 본인이 생성한 정책표 또는 담당자인 그룹의 정책표 또는 정책 생성 가능자 권한이 있는 정책표만 표시
           const hasAccess = isCreator || isManager || hasCreatorPermission;
-          
+
           console.log(`🔍 [정책모드] 팀장 필터링 체크: ${policy.policyTableName}`, {
             policyId: policy.id,
             originalCreatorId: policy.creatorId,
@@ -4835,10 +4835,10 @@ function setupPolicyTableRoutes(app) {
             creatorPermissions,
             hasAccess
           });
-          
+
           return hasAccess;
         });
-        
+
         console.log('✅ [정책모드] 팀장 필터링 완료:', {
           filteredCount: policies.length,
           filtered: policies.map(p => p.policyTableName)
@@ -4848,7 +4848,7 @@ function setupPolicyTableRoutes(app) {
         // 정책영업그룹 목록 조회 - 캐시에서 가져오기
         const userGroupsCacheKey = `user-groups-${SPREADSHEET_ID}`;
         const cachedUserGroups = getCache(userGroupsCacheKey);
-        
+
         const userGroupsMap = new Map();
         if (cachedUserGroups && Array.isArray(cachedUserGroups)) {
           // 캐시에서 가져온 데이터를 Map으로 변환
@@ -4897,7 +4897,7 @@ function setupPolicyTableRoutes(app) {
             console.log('❌ [정책모드] 접근권한 없음:', policy.id);
             return false; // 접근권한이 없으면 접근 불가
           }
-          
+
           // 여러 그룹 중 하나라도 매칭되면 접근 가능
           for (const accessGroupId of accessGroupIds) {
             const groupData = userGroupsMap.get(accessGroupId);
@@ -4915,14 +4915,14 @@ function setupPolicyTableRoutes(app) {
               }
             }
           }
-          
+
           console.log('❌ [정책모드] 정책표 필터링 - 접근 거부:', {
             policyId: policy.id,
             accessGroupIds
           });
           return false;
         });
-        
+
         console.log('✅ [정책모드] 필터링 완료:', {
           filteredCount: policies.length
         });
@@ -4969,9 +4969,9 @@ function setupPolicyTableRoutes(app) {
           userRole: req.headers['x-user-role'],
           permission: permission
         });
-        return res.status(403).json({ 
-          success: false, 
-          error: `권한이 없습니다. (사용자 역할: ${permission.userRole || '없음'})` 
+        return res.status(403).json({
+          success: false,
+          error: `권한이 없습니다. (사용자 역할: ${permission.userRole || '없음'})`
         });
       }
 
@@ -4983,7 +4983,7 @@ function setupPolicyTableRoutes(app) {
       const rawDataCacheKey = `policy-tables-raw-${SPREADSHEET_ID}`;
       let rows = [];
       const cachedRawData = getCache(rawDataCacheKey);
-      
+
       if (cachedRawData && Array.isArray(cachedRawData) && cachedRawData.length > 0) {
         // 캐시에서 해당 정책표 찾기
         const cachedRow = cachedRawData.find(row => row && row[0] === id);
@@ -4992,7 +4992,7 @@ function setupPolicyTableRoutes(app) {
           console.log('✅ [정책표 등록] 원시 데이터 캐시에서 조회');
         }
       }
-      
+
       // 캐시에 없거나 해당 정책표가 없으면 API 호출
       if (rows.length === 0) {
         const response = await withRetry(async () => {
@@ -5017,7 +5017,7 @@ function setupPolicyTableRoutes(app) {
       }
 
       const existingRow = dataRows[dataRowIndex];
-      
+
       // 중복 등록 방지: 이미 등록된 경우
       const isAlreadyRegistered = existingRow[11] === 'Y';
       if (isAlreadyRegistered) {
@@ -5027,7 +5027,7 @@ function setupPolicyTableRoutes(app) {
           alreadyRegistered: true
         });
       }
-      
+
       const updatedRow = [...existingRow];
       // 배열 길이를 최소 16으로 보장 (엑셀파일URL 포함, P열까지)
       while (updatedRow.length < 16) {
@@ -5041,7 +5041,7 @@ function setupPolicyTableRoutes(app) {
 
       // 실제 시트 행 번호 = 헤더(1행) + dataRowIndex(0-based) + 1 = dataRowIndex + 2
       const actualRowNumber = dataRowIndex + 2;
-      
+
       // P열까지 포함하여 저장 (HEADERS_POLICY_TABLE_LIST에 엑셀파일URL 포함)
       await withRetry(async () => {
         return await sheets.spreadsheets.values.update({
@@ -5054,7 +5054,7 @@ function setupPolicyTableRoutes(app) {
 
       // 캐시 무효화: 정책표 등록 시 관련 캐시 무효화
       invalidateRelatedCaches('policy-table', id);
-      
+
       // 원시 데이터 캐시도 무효화 (위에서 선언한 변수 재사용)
       cacheStore.delete(rawDataCacheKey);
       console.log('🗑️ [정책표 등록] 원시 데이터 캐시 무효화');
@@ -5078,7 +5078,7 @@ function setupPolicyTableRoutes(app) {
       const isGeneralPolicyMode = mode === 'generalPolicy' || mode === 'general-policy';
 
       const { sheets, SPREADSHEET_ID } = createSheetsClient();
-      
+
       // 캐시 확인 (30초 TTL)
       const cacheKey = `policy-tables-${SPREADSHEET_ID}-${id}-${mode || 'all'}`;
       const cached = getCache(cacheKey);
@@ -5098,7 +5098,7 @@ function setupPolicyTableRoutes(app) {
 
       const rows = response.data.values || [];
       const row = rows.find(r => r[0] === id);
-      
+
       // 디버깅: excelUrl 확인
       console.log('🔍 [정책표 상세] excelUrl 확인:', {
         id: id,
@@ -5115,7 +5115,7 @@ function setupPolicyTableRoutes(app) {
         // 일반정책모드 필터링: companyNames 기반
         const currentUserId = req.headers['x-user-id'] || req.query.userId;
         const accessGroupIds = parseAccessGroupIds(row[5]); // 접근권한 (그룹ID 배열)
-        
+
         if (accessGroupIds.length === 0) {
           return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
         }
@@ -5124,7 +5124,7 @@ function setupPolicyTableRoutes(app) {
         const userGroupsCacheKey = `user-groups-${SPREADSHEET_ID}`;
         let userGroupsDataRows = [];
         const cachedUserGroups = getCache(userGroupsCacheKey);
-        
+
         if (cachedUserGroups) {
           // 캐시에서 가져온 데이터 사용
           userGroupsDataRows = cachedUserGroups.map(group => {
@@ -5146,13 +5146,13 @@ function setupPolicyTableRoutes(app) {
           const userGroupsRows = userGroupsResponse.data.values || [];
           userGroupsDataRows = userGroupsRows.slice(1);
         }
-        
+
         // 현재 사용자의 업체명 확인 (캐시 활용)
         const generalModeSheetName = '일반모드권한관리';
         const generalModeCacheKey = `general-mode-permission-${SPREADSHEET_ID}`;
         let generalModeRows = [];
         const cachedGeneralMode = getCache(generalModeCacheKey);
-        
+
         if (cachedGeneralMode) {
           generalModeRows = cachedGeneralMode;
         } else {
@@ -5229,7 +5229,7 @@ function setupPolicyTableRoutes(app) {
         const currentUserId = req.headers['x-user-id'];
         const creatorId = row[13] || ''; // 생성자ID
         const accessGroupIds = parseAccessGroupIds(row[5]); // 접근권한 (그룹ID 배열)
-        
+
         // 전화번호 정규화 함수 (정책표 목록 조회와 동일한 로직)
         const normalizePhoneNumber = (phone) => {
           if (!phone) return '';
@@ -5238,7 +5238,7 @@ function setupPolicyTableRoutes(app) {
           // 앞의 0 제거 (01053336333 -> 1053336333)
           return digits.replace(/^0+/, '') || digits;
         };
-        
+
         // 1. 본인이 생성한 정책표인지 확인 (전화번호 정규화 적용)
         let isCreator = false;
         if (creatorId && currentUserId) {
@@ -5246,7 +5246,7 @@ function setupPolicyTableRoutes(app) {
           const normalizedCurrentUserId = normalizePhoneNumber(currentUserId);
           isCreator = normalizedCreatorId && normalizedCurrentUserId && normalizedCreatorId === normalizedCurrentUserId;
         }
-        
+
         // 2. 본인이 담당자인 그룹의 정책표인지 확인
         let isManager = false;
         if (accessGroupIds.length > 0) {
@@ -5260,7 +5260,7 @@ function setupPolicyTableRoutes(app) {
 
           const userGroupsRows = userGroupsResponse.data.values || [];
           const userGroupsDataRows = userGroupsRows.slice(1);
-          
+
           const normalizedCurrentUserId = normalizePhoneNumber(currentUserId);
           for (const accessGroupId of accessGroupIds) {
             const userGroup = userGroupsDataRows.find(r => r[0] === accessGroupId);
@@ -5279,7 +5279,7 @@ function setupPolicyTableRoutes(app) {
             }
           }
         }
-        
+
         // 둘 다 아니면 접근 불가
         if (!isCreator && !isManager) {
           return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
@@ -5290,7 +5290,7 @@ function setupPolicyTableRoutes(app) {
         if (accessGroupIds.length === 0) {
           return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
         }
-        
+
         await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_USER_GROUPS, HEADERS_USER_GROUPS);
         const userGroupsResponse = await withRetry(async () => {
           return await sheets.spreadsheets.values.get({
@@ -5302,7 +5302,7 @@ function setupPolicyTableRoutes(app) {
         const userGroupsRows = userGroupsResponse.data.values || [];
         const userGroupsDataRows = userGroupsRows.slice(1);
         const currentUserId = req.headers['x-user-id'];
-        
+
         // 전화번호 정규화 함수 (정책표 목록 조회와 동일한 로직)
         const normalizePhoneNumber = (phone) => {
           if (!phone) return '';
@@ -5311,7 +5311,7 @@ function setupPolicyTableRoutes(app) {
           // 앞의 0 제거 (01053336333 -> 1053336333)
           return digits.replace(/^0+/, '') || digits;
         };
-        
+
         // 여러 그룹 중 하나라도 매칭되면 접근 가능
         let hasAccess = false;
         const normalizedCurrentUserId = normalizePhoneNumber(currentUserId);
@@ -5331,7 +5331,7 @@ function setupPolicyTableRoutes(app) {
             }
           }
         }
-        
+
         if (!hasAccess) {
           return res.status(403).json({ success: false, error: '이 정책표에 접근할 권한이 없습니다.' });
         }
@@ -5354,13 +5354,13 @@ function setupPolicyTableRoutes(app) {
       const accessGroupId = row[5] || '';
       const accessGroupIds = parseAccessGroupIds(accessGroupId);
       let accessGroupNames = [];
-      
+
       if (!isGeneralPolicyMode && accessGroupIds.length > 0) {
         // 정책영업그룹 조회 (캐시 활용)
         const userGroupsCacheKey = `user-groups-${SPREADSHEET_ID}`;
         let userGroupsNameMap = new Map();
         const cachedUserGroups = getCache(userGroupsCacheKey);
-        
+
         if (cachedUserGroups) {
           // 캐시에서 가져온 데이터 사용
           cachedUserGroups.forEach(group => {
@@ -5377,7 +5377,7 @@ function setupPolicyTableRoutes(app) {
               range: `${SHEET_USER_GROUPS}!A:E`
             });
           });
-          
+
           const userGroupsRows = userGroupsResponse.data.values || [];
           const userGroupsDataRows = userGroupsRows.slice(1);
           userGroupsDataRows.forEach(groupRow => {
@@ -5388,7 +5388,7 @@ function setupPolicyTableRoutes(app) {
             }
           });
         }
-        
+
         // 정책영업그룹 이름 배열 생성
         accessGroupNames = accessGroupIds
           .map(groupId => userGroupsNameMap.get(groupId))
@@ -5478,12 +5478,12 @@ function setupPolicyTableRoutes(app) {
       const rowIndex = rows.findIndex(r => r[0] === id);
       const updatedRow = [...row];
       updatedRow[10] = newImageUrl; // 이미지URL
-      
+
       // 배열 길이를 최소 16으로 보장 (P열까지, 엑셀파일URL 포함)
       while (updatedRow.length < 16) {
         updatedRow.push('');
       }
-      
+
       // updatedRow가 16개 요소(A~P열)를 가지므로 P열까지 포함하여 업데이트
       // rowIndex는 헤더를 포함한 배열 인덱스이므로, 실제 시트 행 번호는 rowIndex + 1
       await withRetry(async () => {
@@ -5540,35 +5540,35 @@ function setupPolicyTableRoutes(app) {
       const https = require('https');
       const http = require('http');
       const url = require('url');
-      
+
       const parsedUrl = new URL(excelUrl);
       const client = parsedUrl.protocol === 'https:' ? https : http;
-      
+
       return new Promise((resolve, reject) => {
         const request = client.get(excelUrl, (fileResponse) => {
           // Content-Type 확인
           const contentType = fileResponse.headers['content-type'] || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-          
+
           // 파일명 추출 (정책표 이름 사용)
           const policyTableName = row[2] || '정책표';
           const safeFileName = policyTableName.replace(/[<>:"/\\|?*]/g, '_');
           const fileName = `${safeFileName}_${id}_${new Date().toISOString().split('T')[0]}.xlsx`;
-          
+
           // 응답 헤더 설정
           res.setHeader('Content-Type', contentType);
           res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
           res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
           res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
-          
+
           // 파일 스트림을 클라이언트로 전달
           fileResponse.pipe(res);
-          
+
           fileResponse.on('end', () => {
             console.log('✅ [정책표] 엑셀 파일 다운로드 완료');
             resolve();
           });
         });
-        
+
         request.on('error', (error) => {
           console.error('❌ [정책표] 엑셀 파일 다운로드 오류:', error);
           if (!res.headersSent) {
@@ -5580,7 +5580,7 @@ function setupPolicyTableRoutes(app) {
           }
           reject(error);
         });
-        
+
         request.setTimeout(30000, () => {
           request.destroy();
           if (!res.headersSent) {
@@ -5609,7 +5609,7 @@ function setupPolicyTableRoutes(app) {
   router.get('/policy-tables/tabs/order', async (req, res) => {
     try {
       const userId = req.headers['x-user-id'] || req.query.userId;
-      
+
       if (!userId) {
         return res.status(400).json({ success: false, error: '사용자 ID가 필요합니다.' });
       }
@@ -5712,11 +5712,11 @@ function setupPolicyTableRoutes(app) {
 
       const now = new Date().toLocaleString('ko-KR');
       const existingRow = userOrderRowIndex !== -1 ? dataRows[userOrderRowIndex] : [];
-      
+
       // 기존 값 유지하면서 업데이트
       const tabOrderJson = order !== undefined ? JSON.stringify(order) : (existingRow[1] || '');
       const cardOrderJson = cardOrder !== undefined ? JSON.stringify(cardOrder) : (existingRow[2] || '');
-      
+
       const newRow = [userId, tabOrderJson, cardOrderJson, now, updatedBy];
 
       if (userOrderRowIndex !== -1) {
@@ -5781,7 +5781,7 @@ function setupPolicyTableRoutes(app) {
       }
 
       const existingRow = rows[rowIndex];
-      
+
       // 수정할 필드만 업데이트 (기존 값 유지)
       const updatedRow = [...existingRow];
       // 배열 길이를 최소 16으로 보장 (P열까지, 엑셀파일URL 포함)
@@ -5926,7 +5926,7 @@ function setupPolicyTableRoutes(app) {
 
       const rows = response.data.values || [];
       const dataRows = rows.length > 1 ? rows.slice(1) : [];
-      
+
       // 해당 사용자의 설정만 필터링
       const userSettings = dataRows
         .filter(row => row[0] === userId)
@@ -5995,7 +5995,7 @@ function setupPolicyTableRoutes(app) {
 
       const rows = response.data.values || [];
       const dataRows = rows.length > 1 ? rows.slice(1) : [];
-      
+
       // 해당 사용자와 정책표ID에 해당하는 행 찾기
       const rowIndex = dataRows.findIndex(row => row[0] === userId && row[1] === policyTableId);
 
@@ -6088,7 +6088,7 @@ function setupPolicyTableRoutes(app) {
 
       const rows = response.data.values || [];
       const dataRows = rows.length > 1 ? rows.slice(1) : [];
-      
+
       const otherPolicyTypes = dataRows
         .filter(row => row[0]) // 정책명이 있는 것만
         .map(row => ({
@@ -6206,8 +6206,8 @@ function setupPolicyTableRoutes(app) {
         return acc;
       }, {})
     });
-    
-    
+
+
     try {
       const { id } = req.params;
       const { companyId, companyName } = req.body;
@@ -6215,7 +6215,7 @@ function setupPolicyTableRoutes(app) {
       const userName = req.headers['x-user-name'] ? decodeURIComponent(req.headers['x-user-name']) : (req.query.userName || '');
       const userRole = req.headers['x-user-role'] || req.query.userRole;
       const mode = req.headers['x-mode'] || req.query.mode; // 일반정책모드/정책모드 구분
-      
+
       console.log('🔍 [POST] 파싱된 값:', {
         id,
         companyId,
@@ -6236,7 +6236,7 @@ function setupPolicyTableRoutes(app) {
       // 정책모드인 경우 대리점아이디관리에서 이름과 직함 정보 가져오기
       let displayName = companyName;
       let qualification = '';
-      
+
       // 정책모드 사용자인 경우 (일반정책모드가 아닌 경우) 대리점아이디관리에서 정보 조회
       // 일반정책모드는 업체명만 사용, 정책모드는 이름+직함 사용
       if (mode !== 'generalPolicy' && userRole) { // 일반정책모드가 아닌 경우
@@ -6346,7 +6346,7 @@ function setupPolicyTableRoutes(app) {
       });
 
       console.log(`✅ [정책표] 확인이력 기록 완료: 업체 ${companyName}`);
-      
+
       // 캐시 무효화: 확인이력 업데이트 시 정책표 상세 캐시 무효화
       invalidateRelatedCaches('policy-table', id);
 
