@@ -176,11 +176,11 @@ function getRateLimitConfig() {
   // Google Sheets API는 DB 사용 여부와 관계없이 항상 엄격한 제한을 적용해야 합니다.
   // DB(Supabase)를 사용하더라도 소스 데이터는 Sheet에서 읽어오기 때문입니다.
   return {
-    MIN_API_INTERVAL_MS: 2000, // 2초 간격 (엄격 제한)
-    MAX_CONCURRENT_REQUESTS: 2, // 동시 요청 2개
+    MIN_API_INTERVAL_MS: 500, // 0.5초 간격 (배치 적용으로 인해 요청 수 감소, 속도 향상 가능)
+    MAX_CONCURRENT_REQUESTS: 5, // 동시 요청 5개 (배치 적용으로 안전)
     CACHE_FRESH_TTL: 10 * 60 * 1000, // 10분
     CACHE_STALE_TTL: 60 * 60 * 1000, // 60분
-    BASE_RETRY_DELAY: 3000 // 3초
+    BASE_RETRY_DELAY: 1000 // 1초
   };
 }
 
@@ -303,20 +303,30 @@ function getCacheEntry(key) {
 }
 
 // 요청 큐 처리 함수
+// 요청 큐 처리 함수
 async function processSheetsRequestQueue() {
-  if (sheetsRequestQueue.length > 0 && currentSheetsRequests < MAX_CONCURRENT_SHEETS_REQUESTS) {
+  const config = getRateLimitConfig();
+  // 🔥 버그 수정: MAX_CONCURRENT_SHEETS_REQUESTS 변수가 정의되지 않아 큐가 멈추는 문제 해결
+  if (sheetsRequestQueue.length > 0 && currentSheetsRequests < config.MAX_CONCURRENT_REQUESTS) {
     const { resolve, reject, fn } = sheetsRequestQueue.shift();
     currentSheetsRequests++;
 
-    try {
-      const result = await fn();
-      resolve(result);
-    } catch (error) {
-      reject(error);
-    } finally {
-      currentSheetsRequests--;
-      processSheetsRequestQueue(); // 다음 요청 처리
-    }
+    // 백그라운드에서 비동기 실행 (await하지 않음 - 큐 회전을 위해)
+    // 단, fn() 내부에서 Rate Limit 대기가 있으므로 실제로는 간격이 조절됨
+    (async () => {
+      try {
+        const result = await fn();
+        if (resolve) resolve(result);
+      } catch (error) {
+        if (reject) reject(error);
+      } finally {
+        currentSheetsRequests--;
+        processSheetsRequestQueue(); // 다음 요청 처리
+      }
+    })();
+
+    // 즉시 재귀 호출하여 동시성 한도까지 추가 실행 시도
+    processSheetsRequestQueue();
   }
 }
 
@@ -378,8 +388,9 @@ async function withRetryGoogleSheets(fn, maxRetries = 5, baseDelay = null) {
           // Rate limiting: 최소 간격 유지
           const now = Date.now();
           const timeSinceLastCall = now - lastApiCallTime;
-          if (timeSinceLastCall < MIN_API_INTERVAL_MS) {
-            await new Promise(resolve => setTimeout(resolve, MIN_API_INTERVAL_MS - timeSinceLastCall));
+          // 🔥 버그 수정: MIN_API_INTERVAL_MS 변수 미정의 문제 해결
+          if (timeSinceLastCall < config.MIN_API_INTERVAL_MS) {
+            await new Promise(resolve => setTimeout(resolve, config.MIN_API_INTERVAL_MS - timeSinceLastCall));
           }
           lastApiCallTime = Date.now();
 
@@ -429,9 +440,12 @@ async function withRetryGoogleSheets(fn, maxRetries = 5, baseDelay = null) {
     };
 
     // 큐에 추가
+    // 큐에 추가
     sheetsRequestQueue.push({
-      resolve: () => executeRequest(),
-      reject,
+      // executeRequest 내부에서 이미 resolve/reject를 호출하므로, 
+      // 큐 프로세서의 resolve/reject 호출은 무시하도록 빈 함수 전달
+      resolve: () => { },
+      reject: () => { },
       fn: executeRequest
     });
 
