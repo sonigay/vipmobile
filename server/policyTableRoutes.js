@@ -313,7 +313,7 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
 
     const collector = targetChannel.createMessageCollector({
       filter,
-      time: 120000, // 120초 대기 (Selenium 스크린샷 생성 시간 고려)
+      time: 240000, // 240초 대기 (Selenium 스크린샷 생성 시간 고려)
       max: 1
     });
 
@@ -412,10 +412,10 @@ async function captureSheetViaDiscordBot(sheetUrl, policyTableName, userName, ch
         });
 
         if (collected.size === 0) {
-          console.error(`❌ [정책표] 완료 신호 수집 실패: 120초 동안 완료 신호를 받지 못했습니다.`);
+          console.error(`❌ [정책표] 완료 신호 수집 실패: 240초 동안 완료 신호를 받지 못했습니다.`);
           console.error(`   타겟 채널/포스트 ID: ${targetChannel.id}`);
           console.error(`   명령어 메시지 ID: ${commandMessageId}`);
-          reject(new Error('디스코드 봇 응답 시간 초과 (120초)'));
+          reject(new Error('디스코드 봇 응답 시간 초과 (240초)'));
         }
       });
     });
