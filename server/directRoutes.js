@@ -559,25 +559,27 @@ async function getPolicySettings(carrier) {
       }))
     });
 
-    // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
-    const addonRes = await withRetry(async () => {
-      return await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_POLICY_ADDON
-      });
-    });
-    const insuranceRes = await withRetry(async () => {
-      return await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_POLICY_INSURANCE
-      });
-    });
-    const specialRes = await withRetry(async () => {
-      return await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: SHEET_POLICY_SPECIAL
-      });
-    });
+    // 🔥 성능 개선: 큐를 통해 병렬 처리 (Rate Limit은 큐 내부에서 제어됨)
+    const [addonRes, insuranceRes, specialRes] = await Promise.all([
+      withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_POLICY_ADDON
+        });
+      }),
+      withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_POLICY_INSURANCE
+        });
+      }),
+      withRetry(async () => {
+        return await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: SHEET_POLICY_SPECIAL
+        });
+      })
+    ]);
 
     const addonRows = (addonRes.data.values || []).slice(1);
     const addonList = addonRows
@@ -706,10 +708,12 @@ async function rebuildPlanMaster(carriersParam) {
       continue;
     }
 
-    // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
-    const planNames = planNameRange ? await getSheetData(sheetId, planNameRange) : [];
-    const planGroups = planGroupRange ? await getSheetData(sheetId, planGroupRange) : [];
-    const basicFees = basicFeeRange ? await getSheetData(sheetId, basicFeeRange) : [];
+    // 🔥 Rate Limit 방지: 큐를 이용한 병렬 처리 (Rate Limit은 큐 내부에서 제어됨)
+    const [planNames, planGroups, basicFees] = await Promise.all([
+      planNameRange ? getSheetData(sheetId, planNameRange) : Promise.resolve([]),
+      planGroupRange ? getSheetData(sheetId, planGroupRange) : Promise.resolve([]),
+      basicFeeRange ? getSheetData(sheetId, basicFeeRange) : Promise.resolve([])
+    ]);
 
     const flatNames = planNames.flat().map(v => (v || '').toString().trim());
     const flatGroups = planGroups.flat().map(v => (v || '').toString().trim());

@@ -84,8 +84,8 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
  * 재시도 로직이 포함된 fetch 래퍼
  */
 
-// 타임아웃 설정 (기본 45초 - 구글 시트 연동 고려)
-const DEFAULT_TIMEOUT = 45000;
+// 타임아웃 설정 (기본 120초 - 구글 시트 연동 + Rate Limit 지연 고려)
+const DEFAULT_TIMEOUT = 120000;
 
 /**
  * 재시도 로직이 포함된 fetch 래퍼 (타임아웃 적용)
