@@ -1444,8 +1444,11 @@ async function processPolicyTableGeneration(jobId, params, discordRequestId = nu
     });
 
     // "정책" 시트를 찾아서 해당 시트의 URL 생성
-    // const originalSheetUrl = policyTablePublicLink || policyTableLink; // publicLink는 ID 추출이 어려울 수 있음
-    const sheetUrl = await getPolicySheetUrl(policyTableLink, true); // 공개 링크 (스크린샷용) - ID 추출을 위해 항상 Edit Link 사용
+    // 1. 스크린샷용 URL: 사용자가 입력한 링크 그대로 사용 (편집 링크여도 봇이 처리 가능하도록)
+    // 기존에 getPolicySheetUrl(..., true)로 강제 pubhtml변환을 했으나, 시트가 게시되지 않은 경우 접근 불가 오류 발생
+    const sheetUrl = policyTablePublicLink || policyTableLink;
+
+    // 2. 엑셀 다운로드용 URL: "정책" 시트의 GID가 포함된 편집 링크 생성
     const editSheetUrl = await getPolicySheetUrl(policyTableLink, false); // 편집 링크 (엑셀 파일용)
 
     console.log(`[정책표 생성] 📸 사용할 시트 URL (스크린샷): ${sheetUrl}`);
