@@ -886,7 +886,7 @@ async function getPolicySheetUrl(originalUrl, isPublicLink = true) {
     // 시트 URL 생성
     if (isPublicLink) {
       // 공개 링크 (pubhtml) - 스크린샷용
-      const publicUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/pubhtml?gid=${sheetId}&single=true`;
+      const publicUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/pubhtml?gid=${sheetId}`;
       console.log(`📸 [정책시트] 공개 링크 생성: ${publicUrl.substring(0, 80)}...`);
       return publicUrl;
     } else {
