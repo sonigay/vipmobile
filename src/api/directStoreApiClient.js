@@ -83,9 +83,21 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 /**
  * 재시도 로직이 포함된 fetch 래퍼
  */
+
+// 타임아웃 설정 (기본 45초 - 구글 시트 연동 고려)
+const DEFAULT_TIMEOUT = 45000;
+
+/**
+ * 재시도 로직이 포함된 fetch 래퍼 (타임아웃 적용)
+ */
 const fetchWithRetry = async (url, options = {}, retryCount = 0) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT);
+  const config = { ...options, signal: controller.signal };
+
   try {
-    const response = await fetch(url, options);
+    const response = await fetch(url, config);
+    clearTimeout(timeoutId);
 
     // 성공 응답 or 304 Not Modified
     if (response.ok || response.status === 304) {
@@ -101,6 +113,15 @@ const fetchWithRetry = async (url, options = {}, retryCount = 0) => {
     // 재시도 불가능하거나 최대 재시도 횟수 초과
     return response;
   } catch (error) {
+    clearTimeout(timeoutId);
+
+    // 타임아웃 에러 처리
+    if (error.name === 'AbortError') {
+      const timeoutError = new Error('서버 응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.');
+      timeoutError.code = 'TIMEOUT';
+      throw timeoutError;
+    }
+
     // 네트워크 오류 등
     if (retryCount < RETRY_CONFIG.maxRetries && isRetryableError(error)) {
       await delay(RETRY_CONFIG.retryDelay * (retryCount + 1));
@@ -144,10 +165,7 @@ const memoryCache = new Map();
 /**
  * 캐시 설정
  */
-const CACHE_CONFIG = {
-  dataTTL: 1000 * 60 * 60, // 1시간 (데이터 유효 데이터로 간주하는 시간) - 이 시간 내에는 캐시 즉시 반환 + 백그라운드 갱신
-  // 만약 "백그라운드 갱신 없이 캐시만 사용"하고 싶다면 별도 옵션 필요하지만, SWR은 항상 백그라운드 갱신을 전제로 함
-};
+
 
 /**
  * 실제 요청 실행 함수 (헬퍼 함수)
