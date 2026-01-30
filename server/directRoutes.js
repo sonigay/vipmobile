@@ -559,50 +559,42 @@ async function getPolicySettings(carrier) {
       }))
     });
 
-    // 🔥 성능 개선: 큐를 통해 병렬 처리 (Rate Limit은 큐 내부에서 제어됨)
-    const [addonRes, insuranceRes, specialRes] = await Promise.all([
-      withRetry(async () => {
-        return await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: SHEET_POLICY_ADDON
-        });
-      }),
-      withRetry(async () => {
-        return await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: SHEET_POLICY_INSURANCE
-        });
-      }),
-      withRetry(async () => {
-        return await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: SHEET_POLICY_SPECIAL
-        });
-      })
-    ]);
+    // 🔥 성능 개선: Batch Get을 사용하여 3개의 시트를 한 번의 API 호출로 가져옴 (구글 시트 쿼터 절약)
+    const batchRes = await withRetry(async () => {
+      return await sheets.spreadsheets.values.batchGet({
+        spreadsheetId: SPREADSHEET_ID,
+        ranges: [
+          SHEET_POLICY_ADDON,
+          SHEET_POLICY_INSURANCE,
+          SHEET_POLICY_SPECIAL
+        ]
+      });
+    });
 
-    const addonRows = (addonRes.data.values || []).slice(1);
+    // batchGet 응답 순서는 ranges 배열 순서와 동일함
+    const valueRanges = batchRes.data.valueRanges || [];
+    const addonRows = (valueRanges[0]?.values || []).slice(1);
+    const insuranceRows = (valueRanges[1]?.values || []).slice(1);
+    const specialRows = (valueRanges[2]?.values || []).slice(1);
+
     const addonList = addonRows
       .filter(row => (row[0] || '').trim() === carrier)
       .map(row => ({
         incentive: Number(row[3] || 0),
-        deduction: -Math.abs(Number(row[4] || 0))  // 부가미유치 차감금액 (음수 처리)
+        deduction: -Math.abs(Number(row[4] || 0))
       }));
 
-    const insuranceRows = (insuranceRes.data.values || []).slice(1);
     const insuranceList = insuranceRows
       .filter(row => (row[0] || '').trim() === carrier)
       .map(row => ({
-        // 보험상품명 및 출고가 구간, 월요금까지 함께 보관 (모델별 선택 로직에 사용)
         name: (row[1] || '').toString().trim(),
         minPrice: Number(row[2] || 0),
         maxPrice: Number(row[3] || 0),
         fee: Number(row[4] || 0),
-        incentive: Number(row[5] || 0), // 보험 유치 추가금액
-        deduction: -Math.abs(Number(row[6] || 0))  // 보험 미유치 차감금액 (음수 처리)
+        incentive: Number(row[5] || 0),
+        deduction: -Math.abs(Number(row[6] || 0))
       }));
 
-    const specialRows = (specialRes.data.values || []).slice(1);
     const specialPolicies = specialRows
       .filter(row => (row[0] || '').trim() === carrier && (row[4] || '').toString().toLowerCase() === 'true')
       .map(row => ({
@@ -708,12 +700,34 @@ async function rebuildPlanMaster(carriersParam) {
       continue;
     }
 
-    // 🔥 Rate Limit 방지: 큐를 이용한 병렬 처리 (Rate Limit은 큐 내부에서 제어됨)
-    const [planNames, planGroups, basicFees] = await Promise.all([
-      planNameRange ? getSheetData(sheetId, planNameRange) : Promise.resolve([]),
-      planGroupRange ? getSheetData(sheetId, planGroupRange) : Promise.resolve([]),
-      basicFeeRange ? getSheetData(sheetId, basicFeeRange) : Promise.resolve([])
-    ]);
+    // 🔥 성능 개선: Batch Get 사용 (1번의 API 호출로 3개 범위 조회)
+    let planNames = [], planGroups = [], basicFees = [];
+    const rangesToFetch = [];
+    if (planNameRange) rangesToFetch.push(planNameRange);
+    if (planGroupRange) rangesToFetch.push(planGroupRange);
+    if (basicFeeRange) rangesToFetch.push(basicFeeRange);
+
+    if (rangesToFetch.length > 0) {
+      try {
+        const batchRes = await withRetry(async () => {
+          return await sheets.spreadsheets.values.batchGet({
+            spreadsheetId: sheetId,
+            ranges: rangesToFetch
+          });
+        });
+
+        const valueRanges = batchRes.data.valueRanges || [];
+        let rangeIdx = 0;
+
+        if (planNameRange) planNames = valueRanges[rangeIdx++]?.values || [];
+        if (planGroupRange) planGroups = valueRanges[rangeIdx++]?.values || [];
+        if (basicFeeRange) basicFees = valueRanges[rangeIdx++]?.values || [];
+      } catch (err) {
+        console.warn(`[Direct] 요금제 데이터 Batch Get 실패 (${sheetId}):`, err.message);
+        perCarrierStats[carrier] = { count: 0, warning: '데이터 조회 실패' };
+        continue;
+      }
+    }
 
     const flatNames = planNames.flat().map(v => (v || '').toString().trim());
     const flatGroups = planGroups.flat().map(v => (v || '').toString().trim());
