@@ -1419,6 +1419,11 @@ async function rebuildPricingMaster(carriersParam) {
     통신사: carriers.join(', ')
   });
 
+  // 전역 상태에 접근 가능한 경우 상태 업데이트
+  if (typeof rebuildStatus !== 'undefined') {
+    rebuildStatus.step = 'PRICING_MASTER (PREPARING)';
+  }
+
   await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_MOBILE_PRICING, HEADERS_MOBILE_PRICING);
 
   // 1. 단말 마스터 읽기 (활성화된 모델만)
@@ -1457,6 +1462,9 @@ async function rebuildPricingMaster(carriersParam) {
   const todayStr = `'${new Date().toISOString().split('T')[0]}`;
 
   for (const carrier of carriers) {
+    if (typeof rebuildStatus !== 'undefined') {
+      rebuildStatus.step = `PRICING_MASTER (${carrier})`;
+    }
     // 해당 통신사의 모델들
     const carrierModels = mobileMasterRows.filter(r => (r[0] || '').toString().trim() === carrier);
     if (carrierModels.length === 0) {
@@ -1539,8 +1547,7 @@ async function rebuildPricingMaster(carriersParam) {
 
           // 2) 각 요금제군/개통유형별 리베이트 범위 읽기
           // 🔥 성능 개선: 모든 리베이트 범위를 병렬로 읽기
-          const rebateLoadPromises = [];
-          const rebateLoadMap = new Map(); // key: `${pgName}|${openingType}`, value: { pgName, openingType, range }
+          const rebateLoadTasks = [];
 
           for (const [pgName, typeRanges] of Object.entries(policyPlanGroupRanges)) {
             if (typeof typeRanges !== 'object') continue;
@@ -1552,13 +1559,7 @@ async function rebuildPricingMaster(carriersParam) {
                 continue;
               }
 
-              const key = `${pgName}|${openingType}`;
-              rebateLoadMap.set(key, { pgName, openingType, range });
-              rebateLoadPromises.push(
-                getSheetData(policySheetId, range)
-                  .then(rebateValues => ({ key, rebateValues, success: true }))
-                  .catch(err => ({ key, error: err, success: false }))
-              );
+              rebateLoadTasks.push({ pgName, openingType, range });
             }
           }
 
@@ -1569,50 +1570,48 @@ async function rebuildPricingMaster(carriersParam) {
           }
 
           // 결과 처리
-          for (const result of rebateResults) {
-            const { pgName, openingType, range } = rebateLoadMap.get(result.key);
+          // 🔥 성능 개선: batchGet을 사용하여 일괄 조회
+          if (rebateLoadTasks.length > 0) {
+            const ranges = rebateLoadTasks.map(t => t.range);
+            const batchResults = await getSheetDataBatch(policySheetId, ranges);
 
-            if (!result.success) {
-              console.warn(`[Direct][rebuildPricingMaster] ${carrier} 리베이트 범위 로딩 실패:`, {
-                planGroup: pgName,
-                openingType,
-                range,
-                error: result.error?.message
-              });
-              policyRebateData[pgName][openingType] = {};
-              continue;
-            }
+            for (let i = 0; i < rebateLoadTasks.length; i++) {
+              const { pgName, openingType } = rebateLoadTasks[i];
+              const rebates = batchResults[i] || [];
 
-            const flatRebates = (result.rebateValues || [])
-              .flat()
-              .map(v => {
-                const n = Number((v || '').toString().replace(/,/g, ''));
-                // 정책표는 "단위(만원)"로 관리되는 경우가 많아 10,000을 곱해 원 단위로 변환
-                return isNaN(n) ? 0 : n * 10000;
-              });
 
-            const rebateMap = {};
-            const maxLen = Math.min(policyModels.length, flatRebates.length);
-            for (let i = 0; i < maxLen; i++) {
-              const m = policyModels[i];
-              if (!m) continue;
-              const rebate = flatRebates[i] || 0;
 
-              // 원본 모델명
-              rebateMap[m] = rebate;
+              const flatRebates = rebates
+                .flat()
+                .map(v => {
+                  const n = Number((v || '').toString().replace(/,/g, ''));
+                  // 정책표는 "단위(만원)"로 관리되는 경우가 많아 10,000을 곱해 원 단위로 변환
+                  return isNaN(n) ? 0 : n * 10000;
+                });
 
-              // 정규화된 모델명/대소문자 변형도 함께 저장해 매칭 성공률을 높임
-              const norm = normalizeModelCode(m);
-              if (norm) {
-                rebateMap[norm] = rebate;
-                rebateMap[norm.toLowerCase()] = rebate;
-                rebateMap[norm.toUpperCase()] = rebate;
+              const rebateMap = {};
+              const maxLen = Math.min(policyModels.length, flatRebates.length);
+              for (let i = 0; i < maxLen; i++) {
+                const m = policyModels[i];
+                if (!m) continue;
+                const rebate = flatRebates[i] || 0;
+
+                // 원본 모델명
+                rebateMap[m] = rebate;
+
+                // 정규화된 모델명/대소문자 변형도 함께 저장해 매칭 성공률을 높임
+                const norm = normalizeModelCode(m);
+                if (norm) {
+                  rebateMap[norm] = rebate;
+                  rebateMap[norm.toLowerCase()] = rebate;
+                  rebateMap[norm.toUpperCase()] = rebate;
+                }
+                rebateMap[m.toLowerCase()] = rebate;
+                rebateMap[m.toUpperCase()] = rebate;
               }
-              rebateMap[m.toLowerCase()] = rebate;
-              rebateMap[m.toUpperCase()] = rebate;
-            }
 
-            policyRebateData[pgName][openingType] = rebateMap;
+              policyRebateData[pgName][openingType] = rebateMap;
+            }
           }
         } catch (err) {
           console.warn(`[Direct][rebuildPricingMaster] ${carrier} 정책표 리베이트 데이터 로딩 실패:`, err.message);
@@ -1621,10 +1620,15 @@ async function rebuildPricingMaster(carriersParam) {
     }
 
     // 3. 지원금표(Support Sheet) 데이터 읽기
-    // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
     const supportOpeningTypeRange = openingTypeRange || '';
-    const modelData = await getSheetData(supportSheetId, modelRange);
-    const openingTypeData = supportOpeningTypeRange ? await getSheetData(supportSheetId, supportOpeningTypeRange) : [];
+
+    // 🔥 성능 개선: batchGet을 사용하여 단말목록과 개통유형목록 일괄 조회
+    const headerRanges = [modelRange];
+    if (supportOpeningTypeRange) headerRanges.push(supportOpeningTypeRange);
+
+    const headerBatchResults = await getSheetDataBatch(supportSheetId, headerRanges);
+    const modelData = headerBatchResults[0] || [];
+    const openingTypeData = (supportOpeningTypeRange && headerBatchResults[1]) ? headerBatchResults[1] : [];
 
     // 모델명 리스트 (매칭용)
     const supportModelsRaw = (modelData || []).flat().map(v => (v || '').toString().trim());
@@ -1633,42 +1637,30 @@ async function rebuildPricingMaster(carriersParam) {
     // 각 요금제군별 지원금 컬럼 읽기 (원본 배열 보존)
     // 🔥 성능 개선: 모든 요금제군별 지원금 컬럼을 병렬로 읽기
     const planGroupDataMapRaw = {}; // Key: PlanGroup -> Array of Supports
-    const supportLoadPromises = [];
-    const supportLoadMap = new Map(); // key: pgName, value: pgRange
+    const supportLoadTasks = [];
 
     for (const [pgNameRaw, pgRange] of Object.entries(planGroupRanges)) {
       if (!pgRange) continue;
-      const pgName = pgNameRaw.trim(); // 🔥 핵심 수정: 키 공백 제거
-      supportLoadMap.set(pgName, pgRange);
-      supportLoadPromises.push(
-        getSheetData(supportSheetId, pgRange)
-          .then(supportValues => ({ pgName, supportValues, success: true }))
-          .catch(err => ({ pgName, error: err, success: false }))
-      );
+      const pgName = pgNameRaw.trim();
+      supportLoadTasks.push({ pgName, pgRange });
     }
 
-    // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
-    const supportResults = [];
-    for (const promise of supportLoadPromises) {
-      supportResults.push(await promise);
-    }
+    // 🔥 성능 개선: batchGet을 사용하여 일괄 조회
+    if (supportLoadTasks.length > 0) {
+      const ranges = supportLoadTasks.map(t => t.pgRange);
+      const batchResults = await getSheetDataBatch(supportSheetId, ranges);
 
-    // 결과 처리
-    for (const result of supportResults) {
-      if (!result.success) {
-        console.warn(`[Direct][rebuildPricingMaster] ${carrier} 요금제군별 지원금 로딩 실패:`, {
-          planGroup: result.pgName,
-          error: result.error?.message
+      for (let i = 0; i < supportLoadTasks.length; i++) {
+        const { pgName } = supportLoadTasks[i];
+
+
+        const supportValues = (batchResults[i] || []).flat();
+
+        planGroupDataMapRaw[pgName] = supportValues.map(v => {
+          const n = Number((v || '').toString().replace(/[^0-9.-]/g, ''));
+          return isNaN(n) ? 0 : n;
         });
-        planGroupDataMapRaw[result.pgName] = [];
-        continue;
       }
-
-      const supportValues = (result.supportValues || []).flat();
-      planGroupDataMapRaw[result.pgName] = supportValues.map(v => {
-        const n = Number((v || '').toString().replace(/[^0-9.-]/g, ''));
-        return isNaN(n) ? 0 : n;
-      });
     }
 
     // 3-1. 지원금표에서 완전히 빈 행만 제거하여 인덱스 정렬
@@ -2548,6 +2540,49 @@ async function refreshImagesFromDiscord(carrier) {
     });
     throw error;
   }
+}
+
+async function getSheetDataBatch(sheetId, ranges, ttlMs = null) {
+  if (!ranges || ranges.length === 0) return [];
+  const config = getRateLimitConfig();
+  const actualTtl = ttlMs || config.CACHE_FRESH_TTL;
+
+  // 캐시 키는 모든 범위를 정렬해서 합침
+  const sortedRanges = [...ranges].sort();
+  const cacheKey = `sheet-data-batch-${sheetId}-${sortedRanges.join(',')}`;
+
+  return withRequestDeduplication(cacheKey, async () => {
+    const { sheets } = createSheetsClient();
+    try {
+      console.log(`🔍 [getSheetDataBatch] 시트 데이터 일괄 조회 시작: sheetId=${sheetId.substring(0, 10)}..., ranges=${ranges.length}개`);
+
+      const res = await withRetry(async () => {
+        return await sheets.spreadsheets.values.batchGet({
+          spreadsheetId: sheetId,
+          ranges: ranges,
+          majorDimension: 'ROWS',
+          valueRenderOption: 'UNFORMATTED_VALUE'
+        });
+      });
+
+      const valueRanges = res.data.valueRanges || [];
+      // 각 범위별로 slice(1) 해서 반환 (getSheetData와 동일한 동작)
+      const results = valueRanges.map(vr => {
+        const values = vr.values || [];
+        return values.length > 0 ? values.slice(1) : [];
+      });
+
+      console.log(`✅ [getSheetDataBatch] 일괄 조회 완료: ranges=${results.length}개`);
+      return results;
+    } catch (error) {
+      console.error(`❌ [getSheetDataBatch] 시트 데이터 일괄 읽기 실패:`, {
+        sheetId: sheetId ? `${sheetId.substring(0, 10)}...` : 'undefined',
+        rangesLength: ranges.length,
+        error: error.message
+      });
+      throw error;
+    }
+  });
 }
 
 // 시트 데이터 읽기 함수 (캐시 적용, 동시 요청 방지)
