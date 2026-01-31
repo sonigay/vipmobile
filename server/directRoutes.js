@@ -1564,10 +1564,10 @@ async function rebuildPricingMaster(carriersParam) {
           }
 
           // 🔥 Rate Limit 방지: 순차 처리로 변경 (Promise.all 대신)
-          const rebateResults = [];
-          for (const promise of rebateLoadPromises) {
-            rebateResults.push(await promise);
-          }
+          // const rebateResults = [];
+          // for (const promise of rebateLoadPromises) {
+          //   rebateResults.push(await promise);
+          // }
 
           // 결과 처리
           // 🔥 성능 개선: batchGet을 사용하여 일괄 조회
@@ -1623,12 +1623,21 @@ async function rebuildPricingMaster(carriersParam) {
     const supportOpeningTypeRange = openingTypeRange || '';
 
     // 🔥 성능 개선: batchGet을 사용하여 단말목록과 개통유형목록 일괄 조회
-    const headerRanges = [modelRange];
+    const headerRanges = [modelRange, 'B:B']; // 모델명, 펫네임
     if (supportOpeningTypeRange) headerRanges.push(supportOpeningTypeRange);
 
     const headerBatchResults = await getSheetDataBatch(supportSheetId, headerRanges);
     const modelData = headerBatchResults[0] || [];
-    const openingTypeData = (supportOpeningTypeRange && headerBatchResults[1]) ? headerBatchResults[1] : [];
+    const petNames = headerBatchResults[1] || [];
+    const openingTypeData = (supportOpeningTypeRange && headerBatchResults[2]) ? headerBatchResults[2] : [];
+
+    // 모델ID별 펫네임 맵 생성
+    const petNameMap = {};
+    for (let i = 0; i < modelData.length; i++) {
+      const mid = (modelData[i]?.[0] || '').toString().trim(); // modelData[i]는 [모델명] 형태
+      const pname = (petNames[i]?.[0] || '').toString().trim();
+      if (mid) petNameMap[mid] = pname;
+    }
 
     // 모델명 리스트 (매칭용)
     const supportModelsRaw = (modelData || []).flat().map(v => (v || '').toString().trim());
@@ -1858,7 +1867,7 @@ async function rebuildPricingMaster(carriersParam) {
     const totalAddonDeduction = safePolicySettings.addonList.reduce((acc, cur) => acc + Math.abs(cur.deduction || 0), 0) +
       safePolicySettings.insuranceList.reduce((acc, cur) => acc + Math.abs(cur.deduction || 0), 0);
     // 별도 정책 합계
-    const specialPolicySum = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (Number(cur.addition) || 0) - (Number(cur.deduction) || 0), 0);
+    const specialPolicySum = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (cur.type === 'addition' ? (Number(cur.amount) || 0) : 0) - (cur.type === 'deduction' ? (Number(cur.amount) || 0) : 0), 0);
 
     // 기본 정책 마진
     // 🔥 수정: baseMargin과 specialPolicySum을 Number로 변환하여 NaN 방지
@@ -1953,8 +1962,8 @@ async function rebuildPricingMaster(carriersParam) {
           // 🔥 핵심 수정: safePolicySettings 사용 및 Number 변환 추가
           const addonIncentiveSum = safePolicySettings.addonList.reduce((acc, cur) => acc + (Number(cur.incentive) || 0), 0);
           const addonDeductionSum = safePolicySettings.addonList.reduce((acc, cur) => acc + (Number(cur.deduction) || 0), 0);
-          const totalSpecialAddition = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (Number(cur.addition) || 0), 0);
-          const totalSpecialDeduction = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (Number(cur.deduction) || 0), 0);
+          const totalSpecialAddition = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (cur.type === 'addition' ? (Number(cur.amount) || 0) : 0), 0);
+          const totalSpecialDeduction = safePolicySettings.specialPolicies.reduce((acc, cur) => acc + (cur.type === 'deduction' ? (Number(cur.amount) || 0) : 0), 0);
 
           // 🔥 수정: 정책마진 = 기본마진 + 별도정책 합계 (1278번 라인의 baseMargin 사용)
           // baseMargin은 for 루프 밖에서 계산되었으므로 그대로 사용
@@ -2028,21 +2037,24 @@ async function rebuildPricingMaster(carriersParam) {
           // 🔥 수정: 부가미유치 기준 제거 (부가서비스 선택/삭제 시 동적 계산으로 대체)
           // 부가미유치 계산 제거
 
+          const purchaseFull = Math.max(0, factoryPrice - publicSupport - storeSupportFull);
+          const requiredAddons = safePolicySettings.addonList.map(a => a.name).join(', ');
+          const petName = petNameMap[modelId] || '';
+
           allRows.push([
-            carrier,
-            modelId,
-            modelName,
-            planGroup,
-            '', // PlanCode (Optional)
-            openingType,
-            factoryPrice,
-            publicSupport,
-            storeSupportFull, // 대리점추가지원금_부가유치
-            // 🔥 수정: 부가미유치 기준 제거 (9번째 컬럼 제거, 이후 컬럼 인덱스 -1)
-            baseMargin,       // 정책마진 (직영점_정책_마진 + 별도정책 반영) - 인덱스: 9 (기존 10)
-            '',               // 정책ID - 인덱스: 10 (기존 11)
-            todayStr,         // 기준일자 - 인덱스: 11 (기존 12)
-            ''                // 비고 - 인덱스: 12 (기존 13)
+            carrier,         // 0: 통신사
+            modelId,         // 1: 모델ID
+            modelName,       // 2: 모델명
+            petName,         // 3: 펫네임
+            openingType,     // 4: 개통유형
+            planGroup,       // 5: 요금제군
+            factoryPrice,    // 6: 출고가
+            publicSupport,   // 7: 공시지원금
+            storeSupportFull,// 8: 대리점추가지원금_부가유치
+            baseMargin,      // 9: 정책마진
+            purchaseFull,    // 10: 구매가_부가유치
+            requiredAddons,  // 11: 필수부가서비스
+            todayStr         // 12: 비고 (기준일자 대용)
           ]);
           createdCount++;
         }
@@ -2065,16 +2077,16 @@ async function rebuildPricingMaster(carriersParam) {
       carrier: row[0],                              // 통신사
       modelId: row[1],                              // 모델ID
       modelName: row[2],                            // 모델명
-      planGroup: row[3],                            // 요금제군
-      planCode: row[4] || '',                       // 요금제코드
-      openingType: row[5],                          // 개통유형
+      planGroup: row[5],                            // 요금제군 (Index 5)
+      planCode: '',                                 // 요금제코드 (HEADERS에 없음)
+      openingType: row[4],                          // 개통유형 (Index 4)
       factoryPrice: row[6] || 0,                    // 출고가
       publicSupport: row[7] || 0,                   // 이통사지원금
       storeAdditionalSupportWithAddon: row[8] || 0, // 대리점추가지원금_부가유치
       policyMargin: row[9] || 0,                    // 정책마진
-      policyId: row[10] || '',                      // 정책ID
-      baseDate: row[11] || '',                      // 기준일자
-      note: row[12] || ''                           // 비고
+      policyId: '',                                 // 정책ID
+      baseDate: row[12] || '',                      // 기준일자 (Index 12)
+      note: ''                                      // 비고
     }));
 
     await DirectStoreDAL.rebuildPricingMaster(pricingData);
