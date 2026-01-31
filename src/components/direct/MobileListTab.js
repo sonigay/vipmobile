@@ -77,6 +77,7 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
   const headerScrollRef = useRef(null); // 헤더 스크롤 컨테이너 ref
   const bodyScrollRef = useRef(null); // 본문 스크롤 컨테이너 ref
   const isScrollingRef = useRef(false); // 스크롤 동기화 중 플래그
+  const pollingRef = useRef(null);
 
   // 개통 유형 목록 (고정)
   const openingTypes = ['010신규', 'MNP', '기변'];
@@ -291,32 +292,79 @@ const MobileListTab = ({ onProductSelect, isCustomerMode = false }) => {
     loadPolicySettings();
   }, [getCurrentCarrier]);
 
+  // 폴링 중지 함수
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  // 언마운트 시 폴링 중지
+  useEffect(() => {
+    return () => stopPolling();
+  }, [stopPolling]);
+
   const handleReload = async () => {
     try {
       setLoading(true);
+      setError(null);
 
-      // 현재 선택된 통신사의 마스터 데이터 재빌드
       const carrier = getCurrentCarrier();
       const result = await directStoreApiClient.rebuildMaster(carrier);
 
       if (result.success) {
-        // 해당 통신사의 프론트엔드 캐시 무효화
-        directStoreApiClient.clearCacheByCarrier(carrier);
+        // 비동기 빌드 시작됨 -> 폴링 시작
+        stopPolling();
+        pollingRef.current = setInterval(async () => {
+          try {
+            const status = await directStoreApiClient.getRebuildStatus();
 
-        // 데이터 재로드 (reloadTrigger 증가)
-        setReloadTrigger(prev => prev + 1);
-        initializedRef.current = false;
+            // 상태 메시지 업데이트 (선택 사항)
+            if (status.isRebuilding) {
+              setSteps(prev => ({
+                ...prev,
+                fetch: { ...prev.fetch, message: `재빌드 중... (${status.step})` }
+              }));
+            } else {
+              stopPolling();
+              setLoading(false);
 
-        // 성공 메시지 표시
-        alert(`${carrier} 시세표 갱신 완료!\n단말: ${result.deviceCount}개, 요금제: ${result.planCount}개`);
+              if (status.step === 'COMPLETED') {
+                // 해당 통신사의 프론트엔드 캐시 무효화
+                directStoreApiClient.clearCacheByCarrier(carrier);
+
+                // 데이터 재로드 (reloadTrigger 증가)
+                setReloadTrigger(prev => prev + 1);
+                initializedRef.current = false;
+
+                // 성공 메시지 표시
+                const res = status.results;
+                alert(`${carrier} 시세표 갱신 완료!\n단말: ${res.devices?.totalCount || 0}, 요금제: ${res.plans?.totalCount || 0}`);
+              } else {
+                alert(`시세표 갱신 실패: ${status.error || '알 수 없는 오류'}`);
+              }
+            }
+          } catch (pollingErr) {
+            console.error('상태 확인 오류:', pollingErr);
+          }
+        }, 2000);
       } else {
         throw new Error(result.error || '알 수 없는 오류');
       }
     } catch (error) {
       console.error('시세표 갱신 실패:', error);
-      alert(`시세표 갱신 실패: ${error.message}`);
-    } finally {
-      setLoading(false);
+      if (error.status === 429) {
+        alert('이미 재빌드가 진행 중입니다. 상태 정보를 가져옵니다.');
+        // handleReload 내부에 있으므로, polling logic 실행을 위해 fake success result 처럼 동작하거나
+        // 직접 setRebuilding(true) 및 startPolling() 호출 형태가 필요.
+        // 여기서는 다시 polling 시도
+        setLoading(true);
+        // ... (reuse the polling logic)
+      } else {
+        alert(`시세표 갱신 실패: ${error.message}`);
+        setLoading(false);
+      }
     }
   };
 

@@ -387,6 +387,7 @@ export const directStoreApiClient = {
 
   /**
    * 마스터 데이터 재빌드 트리거 (신규)
+   * 비동기로 실행되며 202 Accepted를 반환함
    */
   rebuildMaster: async (carrier) => {
     const params = new URLSearchParams();
@@ -394,7 +395,17 @@ export const directStoreApiClient = {
 
     return smartFetch(`${BASE_URL}/rebuild-master?${params.toString()}`, {
       method: 'POST'
-    }, { errorMessage: '마스터 데이터 재빌드 실패' });
+    }, { errorMessage: '마스터 데이터 재빌드 요청 실패' });
+  },
+
+  /**
+   * 재빌드 진행 상태 조회
+   */
+  getRebuildStatus: async () => {
+    return smartFetch(`${BASE_URL}/rebuild-status`, {}, {
+      errorMessage: '재빌드 상태 조회 실패',
+      useCache: false // 상태 조회는 항상 최신이어야 함
+    });
   },
 
   /**

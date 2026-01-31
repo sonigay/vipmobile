@@ -58,7 +58,8 @@ const DirectStoreManagementMode = ({
   const [error, setError] = useState(null);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
-  const [rebuildResult, setRebuildResult] = useState(null);
+  const [rebuildStatus, setRebuildStatus] = useState(null);
+  const pollingRef = useRef(null);
 
   // 인증 상태 (어플 접속 시 이미 검증됨)
   const [isAuthenticated] = useState(true);
@@ -171,28 +172,76 @@ const DirectStoreManagementMode = ({
     }
   };
 
+  // 재빌드 상태 폴링 중단
+  const stopPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  };
+
+  // 컴포넌트 언마운트 시 폴링 중단
+  useEffect(() => {
+    return () => stopPolling();
+  }, []);
+
+  const startPolling = () => {
+    stopPolling();
+    pollingRef.current = setInterval(async () => {
+      try {
+        const status = await directStoreApiClient.getRebuildStatus();
+        setRebuildStatus(status);
+
+        if (!status.isRebuilding) {
+          stopPolling();
+          setRebuilding(false);
+
+          if (status.step === 'COMPLETED') {
+            const result = status.results;
+            alert('마스터 데이터 재빌드가 완료되었습니다.\n' +
+              `요금제: ${result.plans?.totalCount || 0}건\n` +
+              `단말: ${result.devices?.totalCount || 0}건\n` +
+              `정책: ${result.pricing?.totalCount || 0}건`);
+          } else if (status.step === 'FAILED') {
+            alert('재빌드 실패: ' + (status.error || '알 수 없는 오류'));
+          }
+        }
+      } catch (err) {
+        console.error('상태 확인 오류:', err);
+        // 네트워크 일시 오류일 수 있으므로 계속 폴링
+      }
+    }, 2000); // 2초마다 확인
+  };
+
 
   const handleRebuildMaster = async () => {
-    if (!window.confirm('모든 통신사의 마스터 데이터를 재빌드하시겠습니까?\n이 작업은 수 초에서 수십 초가 소요될 수 있습니다.')) {
+    if (!window.confirm('모든 통신사의 마스터 데이터를 재빌드하시겠습니까?\n이 작업은 백그라운드에서 진행되며 수십 초가 소요될 수 있습니다.')) {
       return;
     }
 
     try {
       setRebuilding(true);
+      setRebuildStatus({ step: 'REQUESTING' });
+
       const result = await directStoreApiClient.rebuildMaster(); // 전체 통신사
+
       if (result.success) {
-        alert('마스터 데이터 재빌드가 완료되었습니다.\n' +
-          `요금제: ${result.summary?.plans?.totalCount || 0}건\n` +
-          `단말: ${result.summary?.devices?.totalCount || 0}건\n` +
-          `정책: ${result.summary?.pricing?.totalCount || 0}건`);
+        // 비동기 시작 성공
+        startPolling();
       } else {
-        alert('재빌드 실패: ' + (result.error || '알 수 없는 오류'));
+        alert('재빌드 요청 실패: ' + (result.error || '알 수 없는 오류'));
+        setRebuilding(false);
       }
     } catch (err) {
-      console.error('재빌드 오류:', err);
-      alert('재빌드 중 오류가 발생했습니다.');
-    } finally {
-      setRebuilding(false);
+      console.error('재빌드 요청 오류:', err);
+      // 이미 진행 중인 경우 (429) 처리
+      if (err.status === 429) {
+        alert('이미 재빌드가 진행 중입니다. 상태 정보를 가져옵니다.');
+        startPolling();
+      } else {
+        alert('재빌드 요청 중 오류가 발생했습니다: ' + err.message);
+        setRebuilding(false);
+      }
     }
   };
 
@@ -224,54 +273,54 @@ const DirectStoreManagementMode = ({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: { xs: '100%', sm: 'auto' } }}>
                   <SettingsIcon sx={{ color: 'primary.main', fontSize: { xs: '1.5rem', sm: '2rem' } }} />
                   <Typography variant="h4" sx={{ flexGrow: 1, color: 'primary.main', fontWeight: 700, fontSize: { xs: '1.5rem', sm: '2rem' } }}>
-                  {modeTitle}
-                </Typography>
+                    {modeTitle}
+                  </Typography>
                 </Box>
 
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'flex-end', sm: 'flex-end' } }}>
-                {/* 업데이트 확인 버튼 */}
-                <Button
-                  color="inherit"
+                  {/* 업데이트 확인 버튼 */}
+                  <Button
+                    color="inherit"
                     size={isMobile ? 'small' : 'medium'}
-                  startIcon={<UpdateIcon />}
-                  onClick={() => setShowUpdatePopup(true)}
+                    startIcon={<UpdateIcon />}
+                    onClick={() => setShowUpdatePopup(true)}
                     sx={{ flex: { xs: '1 1 auto', sm: '0 0 auto' }, minWidth: { xs: 'auto', sm: '120px' }, border: '1px solid rgba(255,255,255,0.3)' }}
-                >
+                  >
                     <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>업데이트 확인</Box>
                     <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>업데이트</Box>
-                </Button>
+                  </Button>
 
-                {/* 데이터 재빌드 버튼 */}
-                <Button
-                  color="inherit"
+                  {/* 데이터 재빌드 버튼 */}
+                  <Button
+                    color="inherit"
                     size={isMobile ? 'small' : 'medium'}
-                  startIcon={rebuilding ? <CircularProgress size={20} color="inherit" /> : <BuildIcon />}
-                  onClick={handleRebuildMaster}
-                  disabled={rebuilding}
+                    startIcon={rebuilding ? <CircularProgress size={20} color="inherit" /> : <BuildIcon />}
+                    onClick={handleRebuildMaster}
+                    disabled={rebuilding}
                     sx={{ flex: { xs: '1 1 auto', sm: '0 0 auto' }, minWidth: { xs: 'auto', sm: 'auto' }, border: '1px solid rgba(255,255,255,0.3)' }}
-                >
+                  >
                     <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
-                  {rebuilding ? '빌드 중...' : '데이터 재빌드'}
+                      {rebuilding ? `빌딩 (${rebuildStatus?.step || '준비'})` : '데이터 재빌드'}
                     </Box>
                     <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
                       {rebuilding ? '빌드 중' : '재빌드'}
                     </Box>
-                </Button>
+                  </Button>
 
-                {onModeChange && availableModes && availableModes.length > 1 && (
-                    <Button 
-                      color="inherit" 
+                  {onModeChange && availableModes && availableModes.length > 1 && (
+                    <Button
+                      color="inherit"
                       size={isMobile ? 'small' : 'medium'}
-                      startIcon={<RefreshIcon />} 
-                      onClick={onModeChange} 
+                      startIcon={<RefreshIcon />}
+                      onClick={onModeChange}
                       sx={{ flex: { xs: '1 1 auto', sm: '0 0 auto' }, minWidth: { xs: 'auto', sm: '100px' } }}
                     >
                       <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>모드 변경</Box>
                       <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>모드</Box>
                     </Button>
                   )}
-                  <Button 
-                    color="inherit" 
+                  <Button
+                    color="inherit"
                     onClick={onLogout}
                     size={isMobile ? 'small' : 'medium'}
                     sx={{ flex: { xs: '1 1 auto', sm: '0 0 auto' }, minWidth: { xs: 'auto', sm: '80px' } }}
@@ -345,12 +394,12 @@ const DirectStoreManagementMode = ({
                     key={tab.key}
                     role="tabpanel"
                     hidden={activeTab !== index}
-                    sx={{ 
-                      p: { xs: activeTab === index ? 0 : 2, sm: activeTab === index ? 0 : 3 }, 
-                      bgcolor: '#fff', 
-                      borderRadius: 2, 
-                      boxShadow: 1, 
-                      minHeight: { xs: '300px', sm: '400px' }, 
+                    sx={{
+                      p: { xs: activeTab === index ? 0 : 2, sm: activeTab === index ? 0 : 3 },
+                      bgcolor: '#fff',
+                      borderRadius: 2,
+                      boxShadow: 1,
+                      minHeight: { xs: '300px', sm: '400px' },
                       overflow: 'auto',
                       maxHeight: { xs: 'calc(100vh - 300px)', sm: 'none' },
                       height: '100%',

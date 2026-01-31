@@ -2903,8 +2903,16 @@ async function ensureSheetHeaders(sheets, spreadsheetId, sheetName, headers) {
   }
 }
 
-// 재빌드 진행 상태 락 (Global Lock for Rebuild)
+// 재빌드 진행 상태 관리 (Global Status for Rebuild)
 let isRebuilding = false;
+let rebuildStatus = {
+  startTime: null,
+  endTime: null,
+  step: 'IDLE',
+  error: null,
+  results: null,
+  carriers: []
+};
 
 function setupDirectRoutes(app) {
   const router = express.Router();
@@ -3130,6 +3138,17 @@ function setupDirectRoutes(app) {
     try {
       isRebuilding = true;
       const carriers = carriersParam || ['SK', 'KT', 'LG'];
+
+      // 상태 초기화
+      rebuildStatus = {
+        startTime: Date.now(),
+        endTime: null,
+        step: 'STARTING',
+        error: null,
+        results: null,
+        carriers: carriers
+      };
+
       const results = { summary: {} };
 
       console.log(`🚀 [Direct][executeFullRebuild] 시작: ${carriers.join(', ')}`);
@@ -3142,6 +3161,7 @@ function setupDirectRoutes(app) {
 
       // 1. 요금제 마스터 리빌드
       console.log(`[Direct] Step 1: Rebuilding Plan Master...`);
+      rebuildStatus.step = 'PLAN_MASTER';
       results.plans = await rebuildPlanMaster(carriers);
 
       // 구글 시트 API 할당량 여유를 위한 지연 (2초)
@@ -3149,6 +3169,7 @@ function setupDirectRoutes(app) {
 
       // 2. 단말 마스터 리빌드
       console.log(`[Direct] Step 2: Rebuilding Device Master...`);
+      rebuildStatus.step = 'DEVICE_MASTER';
       results.devices = await rebuildDeviceMaster(carriers);
 
       // 구글 시트 API 할당량 여유를 위한 지연 (2초)
@@ -3156,10 +3177,12 @@ function setupDirectRoutes(app) {
 
       // 3. 단말 요금정책 리빌드
       console.log(`[Direct] Step 3: Rebuilding Pricing Master...`);
+      rebuildStatus.step = 'PRICING_MASTER';
       results.pricing = await rebuildPricingMaster(carriers);
 
       // 4. 재빌드 완료 후 모든 관련 캐시 무효화
       console.log(`[Direct] Step 4: Invalidating all related caches...`);
+      rebuildStatus.step = 'CLEANUP';
       deleteCache('todays-mobiles');
       for (const carrier of ['SK', 'KT', 'LG']) {
         deleteCache(`mobiles-${carrier}`);
@@ -3171,9 +3194,15 @@ function setupDirectRoutes(app) {
       }
 
       console.log(`✅ [Direct][executeFullRebuild] 모든 단계 완료`);
+      rebuildStatus.endTime = Date.now();
+      rebuildStatus.step = 'COMPLETED';
+      rebuildStatus.results = results;
       return results;
     } catch (error) {
       console.error('❌ [Direct][executeFullRebuild] 오류 발생:', error);
+      rebuildStatus.endTime = Date.now();
+      rebuildStatus.step = 'FAILED';
+      rebuildStatus.error = error.message;
       throw error;
     } finally {
       isRebuilding = false;
@@ -3194,33 +3223,46 @@ function setupDirectRoutes(app) {
         });
       }
 
-      const carriers = carrierParam ? [carrierParam] : ['SK', 'KT', 'LG'];
-
-      const results = await executeFullRebuild(carriers);
-
-      return res.json({
-        success: true,
-        carrier: carrierParam || 'ALL',
-        carriers: carriers,
-        deviceCount: results.devices.totalCount,
-        planCount: results.plans.totalCount,
-        pricingCount: results.pricing.totalCount,
-        summary: results
-      });
-    } catch (error) {
-      if (error.message === '재빌드가 이미 진행 중입니다.') {
+      if (isRebuilding) {
         return res.status(429).json({
           success: false,
-          error: error.message
+          error: '재빌드가 이미 진행 중입니다.',
+          status: rebuildStatus
         });
       }
+
+      const carriers = carrierParam ? [carrierParam] : ['SK', 'KT', 'LG'];
+
+      // 🔥 비동기로 실행하고 즉시 응답 반환 (504 Timeout 방지)
+      executeFullRebuild(carriers).catch(err => {
+        console.error('[Direct][rebuild-master] Background rebuild error:', err);
+      });
+
+      return res.status(202).json({
+        success: true,
+        message: '마스터 데이터 재빌드를 시작했습니다. 잠시 후 완료됩니다.',
+        carriers: carriers
+      });
+    } catch (error) {
       console.error('[Direct][rebuild-master] error:', error);
       return res.status(500).json({
         success: false,
-        error: '마스터 데이터 통합 재빌드 실패',
+        error: '마스터 데이터 통합 재빌드 요청 실패',
         message: error.message
       });
     }
+  });
+
+  /**
+   * GET /api/direct/rebuild-status
+   * 재빌드 진행 상태 확인
+   */
+  router.get('/rebuild-status', (req, res) => {
+    res.json({
+      success: true,
+      isRebuilding,
+      ...rebuildStatus
+    });
   });
 
   /**
