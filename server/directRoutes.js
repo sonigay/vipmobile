@@ -2086,7 +2086,7 @@ async function rebuildPricingMaster(carriersParam) {
     await withRetry(async () => {
       return await sheets.spreadsheets.values.clear({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_MOBILE_PRICING}!A2:L` // 수정: M → L (A:L 범위)
+        range: `${SHEET_MOBILE_PRICING}!A2:M` // 수정: L → M (A:M 범위)
       });
     });
 
@@ -2096,7 +2096,7 @@ async function rebuildPricingMaster(carriersParam) {
         // 🔥 수정: 부가미유치 기준 제거로 인해 컬럼 수 감소 (14개 → 13개)
         return await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${SHEET_MOBILE_PRICING}!A2:L${allRows.length + 1}`, // 수정: M → L (A:L 범위)
+          range: `${SHEET_MOBILE_PRICING}!A2:M${allRows.length + 1}`, // 수정: L → M (A:M 범위)
           valueInputOption: 'USER_ENTERED',
           resource: { values: allRows }
         });
