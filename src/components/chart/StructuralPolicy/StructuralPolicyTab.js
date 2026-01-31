@@ -262,6 +262,25 @@ const StructuralPolicyTab = () => {
         );
     }
 
+    if (!data) {
+        return (
+            <Box sx={{ p: 3, textAlign: 'center' }}>
+                <Typography variant="h6" color="error">
+                    데이터를 불러올 수 없습니다. (서버 오류 또는 연결 실패)
+                </Typography>
+                <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() => fetchData(true)}
+                    sx={{ mt: 2 }}
+                    startIcon={<RefreshIcon />}
+                >
+                    다시 시도
+                </Button>
+            </Box>
+        );
+    }
+
     // --- Helper Functions (Defined inside to access 'data') ---
     // --- Helper Functions (Defined inside to access 'data') ---
 

@@ -543,7 +543,14 @@ async function getPolicySettings(carrier) {
     const marginValue = marginRow && marginRow[1] !== undefined && marginRow[1] !== null && marginRow[1] !== ''
       ? marginRow[1]
       : null;
-    const baseMargin = marginValue !== null ? Number(marginValue) || 0 : 0;
+
+    // 🔥 수정: 콤마(,)가 포함된 문자열도 숫자로 변환 (예: "100,000" -> 100000)
+    let marginNum = 0;
+    if (marginValue !== null) {
+      const cleanValue = String(marginValue).replace(/[^0-9.-]/g, '');
+      marginNum = Number(cleanValue) || 0;
+    }
+    const baseMargin = marginNum;
 
     // 🔥 디버그: 정책 마진 읽기 확인 (상세 로그)
     console.log(`[Direct][getPolicySettings] ${carrier} 정책마진 읽기:`, {
@@ -771,6 +778,13 @@ async function rebuildPlanMaster(carriersParam) {
     }
 
     perCarrierStats[carrier] = { count: created };
+  }
+
+  // 🔥 태스크 9 Safety Lock: 데이터가 0건이면 기존 데이터를 지우지 않고 중단
+  if (allRows.length === 0) {
+    const msg = `⚠️ [SafeMode] ${SHEET_PLAN_MASTER} 재빌드 중단: 새로 생성된 데이터가 0건입니다. 기존 데이터를 보호하기 위해 업데이트를 건너뜁니다.`;
+    console.warn(msg);
+    return { totalCount: 0, perCarrier: perCarrierStats, warning: msg };
   }
 
   // 기존 데이터 제거: 헤더를 제외한 모든 행 삭제
@@ -1210,6 +1224,13 @@ async function rebuildDeviceMaster(carriersParam) {
     }
 
     perCarrierStats[carrier] = { count: uniqueCarrierRows.length };
+  }
+
+  // 🔥 태스크 9 Safety Lock: 데이터가 0건이면 기존 데이터를 지우지 않고 중단
+  if (allRows.length === 0) {
+    const msg = `⚠️ [SafeMode] ${SHEET_MOBILE_MASTER} 재빌드 중단: 새로 생성된 데이터가 0건입니다. 기존 데이터를 보호하기 위해 업데이트를 건너뜁니다.`;
+    console.warn(msg);
+    return { success: false, warning: msg };
   }
 
   // 기존 데이터 제거: 헤더를 제외한 모든 행 삭제
@@ -4848,7 +4869,8 @@ function setupDirectRoutes(app) {
       const carrier = req.query.carrier || 'SK';
 
       // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에서 읽기
-      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+      // [Hotfix] 링크 설정은 Google Sheets를 주 데이터소스로 사용하기 위해 Supabase 비활성화 (사용자 요청)
+      const useDatabase = false; // process.env.USE_DB_DIRECT_STORE === 'true';
 
       if (useDatabase) {
         // Supabase에서 읽기 (DirectStoreDAL 사용)
@@ -5258,7 +5280,8 @@ function setupDirectRoutes(app) {
       await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_SETTINGS, HEADERS_SETTINGS);
 
       // 🔥 Feature Flag: USE_DB_DIRECT_STORE가 true이면 Supabase에 저장
-      const useDatabase = process.env.USE_DB_DIRECT_STORE === 'true';
+      // [Hotfix] 링크 설정 복구를 위해 Google Sheets에 강제 저장 (Supabase 비활성화)
+      const useDatabase = false; // process.env.USE_DB_DIRECT_STORE === 'true';
 
       if (useDatabase) {
         console.log(`💾 [POST /api/direct/link-settings] Supabase에 데이터 저장 시작 (${carrier})`);
@@ -5333,18 +5356,28 @@ function setupDirectRoutes(app) {
         spreadsheetId: SPREADSHEET_ID,
         range: SHEET_SETTINGS
       });
+      const settingsRows = settingsRes.data.values || [];
 
       // 통신사별 설정 필터링 및 업데이트/추가
+      // 통신사별 설정 필터링 및 업데이트/추가
       const findRowIdx = (settings, type) => {
-        const labels = {
-          'planGroup': ['planGroup', '요금제그룹', '요금제그룹핑'],
+        // 🔥 수정: 라벨 비교 로직 개선 (공백 제거, 대소문자 무시)
+        const normalize = (str) => (str || '').toString().trim().toLowerCase();
+        const targetType = normalize(type);
+
+        // 동의어 매핑
+        const synonymMap = {
+          'plangroup': ['plangroup', '요금제그룹', '요금제그룹핑'],
           'support': ['support', '이통사지원금', '공시지원금'],
           'policy': ['policy', '정책표', '리베이트']
-        }[type] || [type];
-        return settings.findIndex(row =>
-          (row[0] || '').trim() === carrier &&
-          labels.some(label => (row[1] || '').trim() === label)
-        );
+        };
+        const validLabels = synonymMap[targetType] || [targetType];
+
+        return settings.findIndex(row => {
+          const rowCarrier = normalize(row[0]);
+          const rowType = normalize(row[1]);
+          return rowCarrier === normalize(carrier) && validLabels.includes(rowType);
+        });
       };
 
       if (planGroup) {

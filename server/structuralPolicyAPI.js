@@ -248,6 +248,8 @@ const createStructuralPolicyRoutes = (context) => {
                     const modelNam = (row[idx.model] || '').toString().trim();
                     const planGrp = (row[idx.planGroup] || '').toString().trim();
 
+                    let debugCount = 0; // 🔥 Fix: Initialize debug variable
+
                     // 공통 제외
                     if (policy === 'BLANK' || modelT === 'LTE_2nd모델' || modelT === '5G_2nd모델') return;
                     if (lowCostModels.includes(modelNam)) return;

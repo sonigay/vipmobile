@@ -1218,6 +1218,22 @@ const PolicyTableCreationTab = ({ loggedInStore }) => {
               pollInterval = 10000; // 10초
             }
           }
+        } else if (response.status === 404) {
+          // 404: 작업이 서버에서 사라짐 (서버 재시작 등)
+          const errorText = await response.text().catch(() => '');
+          console.warn('작업을 찾을 수 없음 (404):', errorText);
+
+          setError('서버가 재시작되어 작업 정보가 초기화되었습니다. 다시 시도해주세요.');
+          setGenerationStatus({ status: 'failed', progress: 0, message: '작업 취소됨 (서버 재시작)' });
+
+          // 폴링 중단
+          if (pollingInterval) {
+            clearInterval(pollingInterval);
+            setPollingInterval(null);
+          }
+          return; // 폴링 종료
+        } else {
+          console.warn(`상태 조회 실패: ${response.status}`);
         }
       } catch (error) {
         console.error('상태 조회 오류:', error);

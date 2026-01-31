@@ -1320,6 +1320,16 @@ async function processQueue() {
   isProcessingQueue = true;
 
   try {
+    // 큐가 꽉 차서 처리를 못하는 경우 로깅
+    if (generationQueue.queue.length > 0 && generationQueue.processing.length >= generationQueue.maxConcurrent) {
+      console.warn(`⏳ [큐] 대기 중... (처리 중: ${generationQueue.processing.length}/${generationQueue.maxConcurrent}, 대기: ${generationQueue.queue.length})`);
+      console.warn(`   - 실행 중인 작업: ${JSON.stringify(generationQueue.processing.map(j => ({
+        id: j.jobId,
+        user: j.userName,
+        elapsed: Math.floor((Date.now() - new Date(j.startedAt).getTime()) / 1000) + 's'
+      })))}`);
+    }
+
     while (generationQueue.queue.length > 0 && generationQueue.processing.length < generationQueue.maxConcurrent) {
       const queueItem = generationQueue.queue[0]; // 첫 번째 항목 가져오기
       const { jobId, userId, userName, policyTableName } = queueItem;
@@ -3834,6 +3844,50 @@ function setupPolicyTableRoutes(app) {
       });
     } catch (error) {
       console.error('[정책표] 큐 상태 조회 오류:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // DELETE /api/policy-table/queue
+  // 큐 비상 초기화 API (SS 권한 전용)
+  router.delete('/policy-table/queue', async (req, res) => {
+    try {
+      const permission = await checkPermission(req, ['SS']);
+      if (!permission.hasPermission) {
+        return res.status(403).json({ success: false, error: '권한이 없습니다. (SS 등급 전용)' });
+      }
+
+      const beforeStatus = getQueueStatus();
+
+      // 1. 대기 큐 비우기
+      generationQueue.queue = [];
+
+      // 2. 처리 중 목록 비우기
+      generationQueue.processing = [];
+
+      // 3. 사용자 활성 작업 맵 초기화
+      generationQueue.userActiveJobs.clear();
+
+      // 4. 디스코드 봇 상태 초기화
+      generationQueue.discordBotStatus.activeRequests = 0;
+      generationQueue.discordBotStatus.isAvailable = true;
+
+      // 5. 처리 중 플래그 초기화
+      isProcessingQueue = false;
+
+      console.warn('🚨 [큐] 비상 초기화 실행됨 (by Admin)');
+      console.warn('   - 이전 상태:', JSON.stringify(beforeStatus));
+
+      return res.json({
+        success: true,
+        message: '큐가 강제로 초기화되었습니다.',
+        clearedJobs: {
+          queued: beforeStatus.queueLength,
+          processing: beforeStatus.processingLength
+        }
+      });
+    } catch (error) {
+      console.error('[정책표] 큐 초기화 오류:', error);
       return res.status(500).json({ success: false, error: error.message });
     }
   });
