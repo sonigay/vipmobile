@@ -758,7 +758,10 @@ async function rebuildPlanMaster(carriersParam) {
 
     const flatNames = planNames.flat().map(v => (v || '').toString().trim());
     const flatGroups = planGroups.flat().map(v => (v || '').toString().trim());
-    const flatFees = basicFees.flat().map(v => Number(v || 0));
+    const flatFees = basicFees.flat().map(v => {
+      const cleanVal = (v || '').toString().replace(/[^0-9]/g, '');
+      return Number(cleanVal) || 0;
+    });
 
     const maxLength = Math.max(flatNames.length, flatGroups.length, flatFees.length);
     let created = 0;
@@ -1488,9 +1491,9 @@ async function rebuildPricingMaster(carriersParam) {
     }
 
     // 각 속성이 배열인지 확인하고, 없으면 빈 배열로 설정
-    // 🔥 수정: baseMargin을 Number로 변환하여 NaN 방지
+    // 🔥 수정: baseMargin을 안전하게 파싱 (문자열/콤마 포함 시 처리)
     const safePolicySettings = {
-      baseMargin: Number(policySettings.baseMargin) || 0,
+      baseMargin: Number(String(policySettings.baseMargin || '0').replace(/[^0-9.-]/g, '')) || 0,
       addonList: Array.isArray(policySettings.addonList) ? policySettings.addonList : [],
       insuranceList: Array.isArray(policySettings.insuranceList) ? policySettings.insuranceList : [],
       specialPolicies: Array.isArray(policySettings.specialPolicies) ? policySettings.specialPolicies : []
