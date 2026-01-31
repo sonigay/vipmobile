@@ -550,8 +550,8 @@ export const directStoreApiClient = {
     try {
       const url = `${BASE_URL}/policy-settings?carrier=${carrier}`;
 
-      // 정책 설정 조회도 Heavy Request로 취급
-      return await smartFetch(url, {}, { heavyRequest: true, errorMessage: '정책 설정 조회 실패', useCache: !forceRefresh, forceRefresh });
+      // 정책 설정 조회는 이제 최적화/캐시 적용되어 Heavy하지 않음
+      return await smartFetch(url, {}, { heavyRequest: false, errorMessage: '정책 설정 조회 실패', useCache: !forceRefresh, forceRefresh });
     } catch (error) {
       console.error('정책 설정 조회 실패:', error);
       return { success: false, error: normalizeErrorMessage(error) };
