@@ -158,30 +158,43 @@ const PolicySettingsTab = () => {
                         setSpecialPolicies(converted);
                     }
 
-                    // 🔥 모델 및 요금제군 목록 로드 (조건 입력용)
-                    const carrier = getCurrentCarrier();
-                    try {
-                        const [mobiles, plans] = await Promise.all([
-                            directStoreApiClient.getMobilesMaster(carrier),
-                            directStoreApiClient.getPlansMaster(carrier)
-                        ]);
-                        // 모델명 목록 추출
-                        const modelNames = [...new Set(mobiles.map(m => m.model || m.petName).filter(Boolean))];
-                        setAvailableModels(modelNames);
-                        // 요금제군 목록 추출
-                        const planGroups = [...new Set(plans.map(p => p.planGroup).filter(Boolean))];
-                        setAvailablePlanGroups(planGroups);
-                    } catch (err) {
-                        console.warn('모델/요금제군 목록 로드 실패:', err);
-                    }
                 }
             } catch (err) {
                 console.error('정책 설정 로드 실패:', err);
+                setError('설정을 불러오지 못했습니다.');
             } finally {
                 setLoading(false);
             }
         };
         loadSettings();
+    }, [carrierTab]);
+
+    // 🔥 별도 메타데이터 로드 (모델, 요금제군) - 메인 화면 로딩 차단 방지
+    useEffect(() => {
+        const loadMetaData = async () => {
+            const carrier = getCurrentCarrier();
+            try {
+                // 병렬 로드
+                const [mobiles, plans] = await Promise.all([
+                    directStoreApiClient.getMobilesMaster(carrier),
+                    directStoreApiClient.getPlansMaster(carrier)
+                ]);
+
+                // 모델명 목록 추출
+                const modelNames = [...new Set(mobiles.map(m => m.model || m.petName).filter(Boolean))];
+                setAvailableModels(modelNames);
+
+                // 요금제군 목록 추출
+                const planGroups = [...new Set(plans.map(p => p.planGroup).filter(Boolean))];
+                setAvailablePlanGroups(planGroups);
+
+                console.log(`[PolicySettings] 메타데이터 로드 완료: 모델(${modelNames.length}), 요금제군(${planGroups.length})`);
+            } catch (err) {
+                console.warn('모델/요금제군 목록 로드 실패 (별도정책 조건 설정 기능 제한됨):', err);
+            }
+        };
+
+        loadMetaData();
     }, [carrierTab]);
 
     const handleCarrierChange = (event, newValue) => {

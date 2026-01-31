@@ -517,34 +517,59 @@ async function withRequestDeduplication(key, fetchFn, ttlOverride = null) {
   return promise;
 }
 
+// 정책 설정 캐시 (메모리)
+const policySettingsCache = new Map();
+const POLICY_CACHE_TTL = 5 * 60 * 1000; // 5분
+
+// 정책 설정 읽기 함수 (캐시 적용, 동시 요청 방지)
 // 정책 설정 읽기 함수 (캐시 적용, 동시 요청 방지)
 async function getPolicySettings(carrier) {
   const cacheKey = `policy-settings-${carrier}`;
+  const cached = policySettingsCache.get(cacheKey);
+
+  // 캐시가 유효하면 반환
+  if (cached && (Date.now() - cached.timestamp < POLICY_CACHE_TTL)) {
+    console.log(`⚡ [Direct][getPolicySettings] 캐시 HIT: ${carrier}`);
+    return cached.data;
+  }
 
   return withRequestDeduplication(cacheKey, async () => {
+    console.log(`🔍 [Direct][getPolicySettings] 구글 시트 통합 조회 시작: ${carrier}`);
     const { sheets, SPREADSHEET_ID } = createSheetsClient();
 
-    // 마진 설정 읽기
-    await ensureSheetHeaders(sheets, SPREADSHEET_ID, SHEET_POLICY_MARGIN, HEADERS_POLICY_MARGIN);
-    const marginRes = await withRetry(async () => {
-      return await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_POLICY_MARGIN}!A:B` // 🔥 수정: 명시적으로 A:B 범위 지정
-      });
+    // 🔥 성능 최적화: 4개 시트를 단 한 번의 요청으로 모두 가져옴 (Margin, Addon, Insurance, Special)
+    // 헤더 확인(ensureSheetHeaders)은 읽기 시점에는 불필요하므로 제거 (속도 향상)
+    const batchRes = await withRetry(async () => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000); // 20초 타임아웃
+      try {
+        return await sheets.spreadsheets.values.batchGet({
+          spreadsheetId: SPREADSHEET_ID,
+          ranges: [
+            `${SHEET_POLICY_MARGIN}!A:B`,     // index 0: 마진
+            `${SHEET_POLICY_ADDON}!A:Z`,      // index 1: 부가서비스
+            `${SHEET_POLICY_INSURANCE}!A:Z`,  // index 2: 보험
+            `${SHEET_POLICY_SPECIAL}!A:Z`     // index 3: 별도정책
+          ],
+          // msg: '통합 정책 조회',  // 옵션이므로 주석 처리 (일부 googleapis 버전에 따라 다를 수 있음)
+          signal: controller.signal
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
     });
-    const allMarginRows = marginRes.data.values || [];
-    const marginRows = allMarginRows.slice(1); // 헤더 제거
-    const marginRow = marginRows.find(row => {
-      const rowCarrier = (row[0] || '').toString().trim();
-      const targetCarrier = carrier.toString().trim();
-      return rowCarrier === targetCarrier;
-    });
+
+    const valueRanges = batchRes.data.valueRanges || [];
+
+    // 1. 마진 설정 파싱 (SHEET_POLICY_MARGIN)
+    const marginRows = (valueRanges[0]?.values || []).slice(1);
+    const marginRow = marginRows.find(row => (row[0] || '').toString().trim() === carrier.toString().trim());
+
     // 설정된 마진이 없으면 기본값을 0원으로 처리
     const marginValue = marginRow && marginRow[1] !== undefined && marginRow[1] !== null && marginRow[1] !== ''
       ? marginRow[1]
       : null;
 
-    // 🔥 수정: 콤마(,)가 포함된 문자열도 숫자로 변환 (예: "100,000" -> 100000)
     let marginNum = 0;
     if (marginValue !== null) {
       const cleanValue = String(marginValue).replace(/[^0-9.-]/g, '');
@@ -552,83 +577,64 @@ async function getPolicySettings(carrier) {
     }
     const baseMargin = marginNum;
 
-    // 🔥 디버그: 정책 마진 읽기 확인 (상세 로그)
-    console.log(`[Direct][getPolicySettings] ${carrier} 정책마진 읽기:`, {
-      sheetName: SHEET_POLICY_MARGIN,
-      allRowsCount: allMarginRows.length,
-      marginRowsCount: marginRows.length,
-      foundRow: marginRow ? true : false,
-      marginRowData: marginRow ? {
-        carrier: marginRow[0],
-        carrierType: typeof marginRow[0],
-        margin: marginRow[1],
-        marginType: typeof marginRow[1],
-        marginRaw: marginRow[1],
-        marginNumber: Number(marginRow[1] || 0),
-        rowLength: marginRow.length,
-        fullRow: marginRow
-      } : null,
-      marginValue: marginValue,
-      finalBaseMargin: baseMargin,
-      allCarriers: marginRows.map((r, idx) => ({
-        index: idx,
-        carrier: r[0],
-        carrierType: typeof r[0],
-        margin: r[1],
-        marginType: typeof r[1],
-        fullRow: r
-      }))
-    });
-
-    // 🔥 성능 개선: Batch Get을 사용하여 3개의 시트를 한 번의 API 호출로 가져옴 (구글 시트 쿼터 절약)
-    const batchRes = await withRetry(async () => {
-      return await sheets.spreadsheets.values.batchGet({
-        spreadsheetId: SPREADSHEET_ID,
-        ranges: [
-          SHEET_POLICY_ADDON,
-          SHEET_POLICY_INSURANCE,
-          SHEET_POLICY_SPECIAL
-        ]
-      });
-    });
-
-    // batchGet 응답 순서는 ranges 배열 순서와 동일함
-    const valueRanges = batchRes.data.valueRanges || [];
-    const addonRows = (valueRanges[0]?.values || []).slice(1);
-    const insuranceRows = (valueRanges[1]?.values || []).slice(1);
-    const specialRows = (valueRanges[2]?.values || []).slice(1);
-
+    // 2. 부가서비스 설정 파싱 (SHEET_POLICY_ADDON)
+    const addonRows = (valueRanges[1]?.values || []).slice(1);
     const addonList = addonRows
       .filter(row => (row[0] || '').trim() === carrier)
       .map(row => ({
-        incentive: Number(row[3] || 0),
-        deduction: -Math.abs(Number(row[4] || 0))
+        carrier: row[0],
+        name: row[1] || '',
+        fee: Number(row[2] || 0),           // 월요금
+        incentive: Number(row[3] || 0),     // 유치추가금액
+        deduction: -Math.abs(Number(row[4] || 0)), // 미유치차감금액 (음수 처리)
+        description: row[5] || '',
+        url: row[6] || ''
       }));
 
+    // 3. 보험상품 설정 파싱 (SHEET_POLICY_INSURANCE)
+    const insuranceRows = (valueRanges[2]?.values || []).slice(1);
     const insuranceList = insuranceRows
       .filter(row => (row[0] || '').trim() === carrier)
       .map(row => ({
-        name: (row[1] || '').toString().trim(),
+        carrier: row[0],
+        name: row[1] || '',
         minPrice: Number(row[2] || 0),
         maxPrice: Number(row[3] || 0),
         fee: Number(row[4] || 0),
         incentive: Number(row[5] || 0),
-        deduction: -Math.abs(Number(row[6] || 0))
+        deduction: -Math.abs(Number(row[6] || 0)),
+        description: row[7] || '',
+        url: row[8] || ''
       }));
 
+    // 4. 별도 정책 설정 파싱 (SHEET_POLICY_SPECIAL)
+    const specialRows = (valueRanges[3]?.values || []).slice(1);
     const specialPolicies = specialRows
-      .filter(row => (row[0] || '').trim() === carrier && (row[4] || '').toString().toLowerCase() === 'true')
+      .filter(row => (row[0] || '').trim() === carrier && (row[4] || '').toString().toUpperCase() === 'TRUE')
       .map(row => ({
-        addition: Number(row[2] || 0),
-        deduction: Number(row[3] || 0)
+        carrier: row[0],
+        name: row[1] || '',
+        policyType: row[2] || 'general',
+        amount: Number(row[3] || 0),
+        isActive: true, // 필터링했으므로 true
+        conditionsJson: row[5] || ''
       }));
 
-    return {
+    const result = {
       baseMargin,
       addonList,
       insuranceList,
       specialPolicies
     };
+
+    // 캐시 저장
+    policySettingsCache.set(cacheKey, {
+      timestamp: Date.now(),
+      data: result
+    });
+    console.log(`✅ [Direct] 정책 설정 통합 조회 완료: ${carrier} (마진:${baseMargin}, 부가:${addonList.length}, 보험:${insuranceList.length}, 별도:${specialPolicies.length})`);
+
+    return result;
   });
 }
 
@@ -4731,7 +4737,10 @@ function setupDirectRoutes(app) {
         }
       }
 
-      // 정책 설정 캐시 무효화
+      // 정책 설정 캐시 무효화 (메모리 캐시)
+      policySettingsCache.delete(`policy-settings-${carrier}`);
+      console.log(`🧹 [Direct] 정책 설정 메모리 캐시 무효화: policy-settings-${carrier}`);
+
       deleteCache(`policy-settings-${carrier}`);
 
       res.json({ success: true });
